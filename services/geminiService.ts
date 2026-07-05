@@ -171,7 +171,7 @@ export const askAboutContext = async (
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
     const chat = ai.chats.create({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3-flash-preview",
       config: {
         systemInstruction: `You are a world-class English Lexicographer and Stylistic Analyst. 
         You are assisting an advanced English learner via a side-bar interface.
@@ -239,7 +239,7 @@ export const checkSentence = async (word: string, sentence: string): Promise<Pra
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3-flash-preview",
       contents: `Act as a constructive and encouraging English tutor for advanced learners.
       
       TARGET WORD: "${word}"
@@ -266,7 +266,7 @@ export const explainContext = async (word: string, sentence: string): Promise<Co
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3-flash-preview",
       contents: `Explain "${word}" specifically in the context of this sentence: "${sentence}"`,
       config: {
         responseMimeType: "application/json",
@@ -285,7 +285,7 @@ export const analyzeContextFromText = async (word: string, fullText: string): Pr
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3-flash-preview",
       contents: `Word: "${word}". Text: "${fullText.substring(0, 8000)}". Task: Find the sentence where "${word}" appears and explain its specific meaning.`,
       config: {
         responseMimeType: "application/json",
@@ -338,7 +338,7 @@ export const analyzeVocabulary = async (text: string): Promise<VocabularySuggest
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3-flash-preview",
       contents: `Identify 5-10 advanced terms in: "${text.substring(0, 5000)}"`,
       config: {
         responseMimeType: "application/json",
@@ -357,7 +357,7 @@ export const generatePodcastScript = async (words: string[]): Promise<PodcastScr
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3-flash-preview",
       contents: `Create a casual, intellectually stimulating podcast script discussing these specific words: ${words.join(', ')}. 
       
       HOSTS: Alex and Jamie.
@@ -409,7 +409,7 @@ export const compareSynonyms = async (word1: string, word2: string, word3?: stri
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3-flash-preview",
       contents: `Compare synonyms: ${word1}, ${word2}${word3 ? ', ' + word3 : ''}.`,
       config: {
         responseMimeType: "application/json",
@@ -428,7 +428,7 @@ export const analyzeSentence = async (sentence: string): Promise<SentenceAnalysi
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3-flash-preview",
       contents: `Break down advanced English sentence: "${sentence}".`,
       config: {
         responseMimeType: "application/json",
