@@ -27,6 +27,7 @@ export interface QuestDef {
 export const DAILY_QUESTS: QuestDef[] = [
   { id: 'review_10', label: 'Review 10 flashcards', target: 10, metric: 'reviews', bonusXp: 30 },
   { id: 'practice_2', label: 'Write 2 practice sentences', target: 2, metric: 'practices', bonusXp: 30 },
+  { id: 'speaking_1', label: 'Complete 1 speaking exercise', target: 1, metric: 'speaking', bonusXp: 30 },
   { id: 'save_1', label: 'Save 1 new word', target: 1, metric: 'savedWords', bonusXp: 15 },
   { id: 'podcast_1', label: 'Generate 1 podcast dialogue', target: 1, metric: 'podcasts', bonusXp: 20 },
 ];

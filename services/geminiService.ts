@@ -442,3 +442,18 @@ export const analyzeSentence = async (sentence: string): Promise<SentenceAnalysi
     throw error;
   }
 };
+
+export const transcribeAudio = async (base64Audio: string, mimeType: string): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: [{
+      parts: [
+        { inlineData: { data: base64Audio, mimeType } },
+        { text: "Transcribe this English speech verbatim. Return ONLY the transcribed words, no punctuation commentary, no quotes, no explanations. If there is no intelligible speech, return an empty string." },
+      ],
+    }],
+    config: { temperature: 0 },
+  });
+  return (response.text || '').trim();
+};

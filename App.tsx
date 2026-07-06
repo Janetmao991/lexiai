@@ -5,6 +5,7 @@ import { Notebook } from './components/Notebook.tsx';
 import { Flashcards } from './components/Flashcards.tsx';
 import { Practice } from './components/Practice.tsx';
 import { Podcast } from './components/Podcast.tsx';
+import { Speaking, SpeakingKind } from './components/Speaking.tsx';
 import { WordEntry, ViewState, SrsRating, UserStats } from './types.ts';
 import { Book, GraduationCap, LayoutGrid, PenTool, X, Cloud, CloudOff, Loader2, Mic2, Database, Terminal, LogOut, Download, Upload, Flame } from 'lucide-react';
 import { localStorageService } from './services/localStorageService.ts';
@@ -133,6 +134,13 @@ const App: React.FC = () => {
   const handleGameComplete = () => statsService.record('game', allWords());
   const handlePodcastGenerated = () => statsService.record('podcast', allWords());
 
+  const handleSpeakingDone = (word: WordEntry, kind: SpeakingKind, passed: boolean) => {
+    if (kind === 'sentence' && passed && !word.mastery?.speakingPassed) {
+      handleSaveWord({ ...word, mastery: { ...word.mastery, speakingPassed: true } });
+    }
+    if (passed) statsService.record('speaking', allWords());
+  };
+
   const handleDeleteWord = async (wordId: string) => {
     localStorageService.deleteWord(wordId);
     setSavedWords(prev => prev.filter(w => w.word !== wordId));
@@ -219,6 +227,7 @@ const App: React.FC = () => {
     { id: ViewState.NOTEBOOK, label: 'Notebook', icon: <LayoutGrid className="w-4 h-4" /> },
     { id: ViewState.FLASHCARDS, label: 'Flashcards', icon: <PenTool className="w-4 h-4" /> },
     { id: ViewState.PRACTICE, label: 'Practice', icon: <PenTool className="w-4 h-4" /> },
+    { id: ViewState.SPEAKING, label: 'Speaking', icon: <Mic2 className="w-4 h-4" /> },
     { id: ViewState.PODCAST, label: 'Podcast', icon: <Mic2 className="w-4 h-4" /> },
   ];
 
@@ -381,6 +390,7 @@ const App: React.FC = () => {
         {view === ViewState.NOTEBOOK && <Notebook words={savedWords} onDelete={handleDeleteWord} onPractice={(w) => { setPracticeTarget(w); setView(ViewState.PRACTICE); }} onUpdateWord={handleSaveWord} />}
         {view === ViewState.FLASHCARDS && <Flashcards words={savedWords} onReview={handleReview} onGameComplete={handleGameComplete} />}
         {view === ViewState.PRACTICE && <Practice initialWord={practiceTarget} words={savedWords} onScored={handlePracticeScored} />}
+        {view === ViewState.SPEAKING && <Speaking words={savedWords} onExerciseDone={handleSpeakingDone} />}
         {view === ViewState.PODCAST && <Podcast words={savedWords} onGenerated={handlePodcastGenerated} />}
       </main>
     </div>
