@@ -16,6 +16,7 @@ import { srsService } from './services/srsService.ts';
 import { statsService, levelForXp } from './services/statsService.ts';
 import { ProgressPanel } from './components/ProgressPanel.tsx';
 import { Settings } from './components/Settings.tsx';
+import { hasApiKey } from './services/geminiService.ts';
 import type { Session } from '@supabase/supabase-js';
 
 const App: React.FC = () => {
@@ -42,6 +43,7 @@ const App: React.FC = () => {
   const [stats, setStats] = useState<UserStats>(() => statsService.get());
   const [showProgress, setShowProgress] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [keyConfigured, setKeyConfigured] = useState(() => hasApiKey());
 
   const refreshFromLocal = () => {
     const localWordsMap = localStorageService.getAllWords();
@@ -393,7 +395,23 @@ const App: React.FC = () => {
       )}
 
       {showProgress && <ProgressPanel stats={stats} words={savedWords} onClose={() => setShowProgress(false)} />}
-      {showSettings && <Settings onClose={() => setShowSettings(false)} />}
+      {showSettings && <Settings onClose={() => { setShowSettings(false); setKeyConfigured(hasApiKey()); }} />}
+
+      {!keyConfigured && (
+        <div className="bg-amber-50 border-b border-amber-100">
+          <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+            <p className="text-sm text-amber-800">
+              AI features need a Gemini API key (free). It stays in this browser only.
+            </p>
+            <button
+              onClick={() => setShowSettings(true)}
+              className="shrink-0 px-4 py-1.5 bg-stone-900 text-white rounded-full text-xs font-bold hover:bg-black transition-colors"
+            >
+              Open Settings
+            </button>
+          </div>
+        </div>
+      )}
 
       <main className="max-w-5xl mx-auto px-4 py-12">
         {view === ViewState.DICTIONARY && <Dictionary onSave={handleSaveWord} savedWords={savedWords} />}

@@ -43,7 +43,7 @@ export const Podcast: React.FC<PodcastProps> = ({ words, onGenerated }) => {
     } catch (e) {
         console.error(e);
         setStep('SELECT');
-        alert("Failed to generate podcast. Please try again.");
+        alert(`Failed to generate podcast: ${(e as Error)?.message || 'Please try again.'}`);
     }
   };
 
