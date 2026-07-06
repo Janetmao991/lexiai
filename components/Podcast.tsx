@@ -6,9 +6,10 @@ import { Mic2, Play, Pause, Loader2, RotateCcw } from 'lucide-react';
 
 interface PodcastProps {
   words: WordEntry[];
+  onGenerated?: () => void;
 }
 
-export const Podcast: React.FC<PodcastProps> = ({ words }) => {
+export const Podcast: React.FC<PodcastProps> = ({ words, onGenerated }) => {
   const [selectedWords, setSelectedWords] = useState<string[]>([]);
   const [step, setStep] = useState<'SELECT' | 'GENERATING' | 'PLAYING'>('SELECT');
   const [script, setScript] = useState<PodcastScript | null>(null);
@@ -38,6 +39,7 @@ export const Podcast: React.FC<PodcastProps> = ({ words }) => {
         const url = URL.createObjectURL(wavBlob);
         setAudioUrl(url);
         setStep('PLAYING');
+        onGenerated?.();
     } catch (e) {
         console.error(e);
         setStep('SELECT');

@@ -7,9 +7,10 @@ import { PenTool, Check, AlertCircle, RefreshCw, Loader2, Award } from 'lucide-r
 interface PracticeProps {
   initialWord?: WordEntry;
   words: WordEntry[];
+  onScored?: (word: WordEntry, score: number) => void;
 }
 
-export const Practice: React.FC<PracticeProps> = ({ initialWord, words }) => {
+export const Practice: React.FC<PracticeProps> = ({ initialWord, words, onScored }) => {
   if (words.length === 0) {
     return (
         <div className="text-center py-20 text-stone-400">
@@ -30,6 +31,7 @@ export const Practice: React.FC<PracticeProps> = ({ initialWord, words }) => {
     try {
       const result = await checkSentence(selectedWord.word, sentence);
       setFeedback(result);
+      if (result) onScored?.(selectedWord, result.score);
     } catch (e) {
       console.error(e);
     } finally {

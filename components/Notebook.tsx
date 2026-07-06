@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { WordEntry, UserContext } from '../types';
 import { analyzeContextFromText, playPronunciation, askAboutContext } from '../services/geminiService';
+import { srsService, MASTERY_META } from '../services/srsService';
 import { Trash2, Book, ArrowRight, TrendingUp, ChevronDown, Plus, FileText, Loader2, X, Maximize2, Layers, CloudOff, RefreshCw, Check, Search, Volume2, MessageSquare, Send, Sparkles, BookOpen, Tag } from 'lucide-react';
 
 interface Message {
@@ -254,6 +255,12 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onPractice,
                       </div>
                       <div className="flex items-center flex-wrap gap-2">
                         <span className="text-sm text-stone-400 font-mono tracking-wide opacity-70 mr-2">/{entry.ipa}/</span>
+                        <span
+                          title={`Mastery: ${MASTERY_META[srsService.masteryLevel(entry)].label}`}
+                          className="text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-full border bg-amber-50/60 text-amber-700 border-amber-100"
+                        >
+                          {MASTERY_META[srsService.masteryLevel(entry)].icon} {MASTERY_META[srsService.masteryLevel(entry)].label}
+                        </span>
                         {entry.meanings.map((m, i) => (
                              <span key={i} className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-full border ${isFinance(m.partOfSpeech) ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-stone-50 text-stone-500 border-stone-100'}`}>
                                   {m.partOfSpeech}

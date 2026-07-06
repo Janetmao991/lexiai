@@ -5,12 +5,15 @@ import { Notebook } from './components/Notebook.tsx';
 import { Flashcards } from './components/Flashcards.tsx';
 import { Practice } from './components/Practice.tsx';
 import { Podcast } from './components/Podcast.tsx';
-import { WordEntry, ViewState } from './types.ts';
-import { Book, GraduationCap, LayoutGrid, PenTool, X, Cloud, CloudOff, Loader2, Mic2, Database, Terminal, LogOut, Download, Upload } from 'lucide-react';
+import { WordEntry, ViewState, SrsRating, UserStats } from './types.ts';
+import { Book, GraduationCap, LayoutGrid, PenTool, X, Cloud, CloudOff, Loader2, Mic2, Database, Terminal, LogOut, Download, Upload, Flame } from 'lucide-react';
 import { localStorageService } from './services/localStorageService.ts';
 import { syncService } from './services/syncService.ts';
 import { cloudService } from './services/cloudService.ts';
 import { supabase, isCloudConfigured } from './services/supabaseClient.ts';
+import { srsService } from './services/srsService.ts';
+import { statsService, levelForXp } from './services/statsService.ts';
+import { ProgressPanel } from './components/ProgressPanel.tsx';
 import type { Session } from '@supabase/supabase-js';
 
 const App: React.FC = () => {
@@ -34,6 +37,9 @@ const App: React.FC = () => {
   const [authMessage, setAuthMessage] = useState<string | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
 
+  const [stats, setStats] = useState<UserStats>(() => statsService.get());
+  const [showProgress, setShowProgress] = useState(false);
+
   const refreshFromLocal = () => {
     const localWordsMap = localStorageService.getAllWords();
     const sorted = Object.values(localWordsMap).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
@@ -42,6 +48,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     refreshFromLocal();
+    return statsService.subscribe(setStats);
   }, []);
 
   // Track auth session
@@ -56,7 +63,11 @@ const App: React.FC = () => {
 
   // Sync whenever we have a logged-in user
   useEffect(() => {
-    if (!session) return;
+    if (!session) {
+      statsService.setUser(null);
+      return;
+    }
+    statsService.syncWithCloud(session.user.id);
     const runSync = async () => {
       setSyncStatus('syncing');
       try {
@@ -75,9 +86,10 @@ const App: React.FC = () => {
   }, [session?.user.id]);
 
   const handleSaveWord = async (w: WordEntry) => {
+    const isNew = !localStorageService.hasWord(w.word);
     const entry: WordEntry = {
       ...w,
-      timestamp: Date.now(),
+      timestamp: w.timestamp || Date.now(), // preserve original save date on updates
       lastModified: new Date().toISOString(),
       syncStatus: 'pending'
     };
@@ -88,6 +100,10 @@ const App: React.FC = () => {
       return [entry, ...filtered].sort((a, b) => b.timestamp - a.timestamp);
     });
 
+    if (isNew) {
+      statsService.record('save', Object.values(localStorageService.getAllWords()));
+    }
+
     if (session) {
       cloudService.saveWord(session.user.id, w.word, entry)
         .then(() => {
@@ -97,6 +113,25 @@ const App: React.FC = () => {
         .catch(e => console.warn('Background cloud sync deferred.', e));
     }
   };
+
+  const allWords = () => Object.values(localStorageService.getAllWords());
+
+  const handleReview = (entry: WordEntry, rating: SrsRating) => {
+    const updated: WordEntry = { ...entry, srs: srsService.schedule(entry.srs, rating) };
+    handleSaveWord(updated);
+    statsService.record('review', allWords());
+  };
+
+  const handlePracticeScored = (word: WordEntry, score: number) => {
+    const best = Math.max(word.mastery?.bestPracticeScore ?? 0, score);
+    if (best !== word.mastery?.bestPracticeScore) {
+      handleSaveWord({ ...word, mastery: { ...word.mastery, bestPracticeScore: best } });
+    }
+    statsService.record(score >= 80 ? 'practiceHigh' : 'practice', allWords());
+  };
+
+  const handleGameComplete = () => statsService.record('game', allWords());
+  const handlePodcastGenerated = () => statsService.record('podcast', allWords());
 
   const handleDeleteWord = async (wordId: string) => {
     localStorageService.deleteWord(wordId);
@@ -216,6 +251,16 @@ const App: React.FC = () => {
 
           <div className="flex items-center gap-2">
             <button
+              onClick={() => setShowProgress(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-stone-200 bg-white text-xs font-bold text-stone-600 hover:border-stone-400 transition-all"
+              title="Your progress"
+            >
+              <Flame className={`w-3.5 h-3.5 ${stats.streakCurrent > 0 ? 'text-orange-500' : 'text-stone-300'}`} />
+              {stats.streakCurrent}
+              <span className="text-stone-300">·</span>
+              <span className="text-stone-500">Lv{levelForXp(stats.xp)}</span>
+            </button>
+            <button
               onClick={() => setShowAccount(true)}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold uppercase tracking-wider transition-all ${
                 syncStatus === 'syncing' ? 'bg-amber-50 border-amber-100 text-amber-600' :
@@ -329,12 +374,14 @@ const App: React.FC = () => {
         </div>
       )}
 
+      {showProgress && <ProgressPanel stats={stats} words={savedWords} onClose={() => setShowProgress(false)} />}
+
       <main className="max-w-5xl mx-auto px-4 py-12">
         {view === ViewState.DICTIONARY && <Dictionary onSave={handleSaveWord} savedWords={savedWords} />}
         {view === ViewState.NOTEBOOK && <Notebook words={savedWords} onDelete={handleDeleteWord} onPractice={(w) => { setPracticeTarget(w); setView(ViewState.PRACTICE); }} onUpdateWord={handleSaveWord} />}
-        {view === ViewState.FLASHCARDS && <Flashcards words={savedWords} />}
-        {view === ViewState.PRACTICE && <Practice initialWord={practiceTarget} words={savedWords} />}
-        {view === ViewState.PODCAST && <Podcast words={savedWords} />}
+        {view === ViewState.FLASHCARDS && <Flashcards words={savedWords} onReview={handleReview} onGameComplete={handleGameComplete} />}
+        {view === ViewState.PRACTICE && <Practice initialWord={practiceTarget} words={savedWords} onScored={handlePracticeScored} />}
+        {view === ViewState.PODCAST && <Podcast words={savedWords} onGenerated={handlePodcastGenerated} />}
       </main>
     </div>
   );
