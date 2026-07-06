@@ -2,6 +2,22 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { WordEntry, PracticeFeedback, ContextExplanation, VocabularySuggestion, PodcastScript, SynonymComparison, SentenceAnalysis } from "../types";
 
+// ---- BYOK: the Gemini key lives in this browser only ----
+export const getApiKey = (): string =>
+  (typeof localStorage !== 'undefined' && localStorage.getItem('lexiai_api_key')) || process.env.API_KEY || '';
+
+export const hasApiKey = (): boolean => Boolean(getApiKey());
+
+export const getTextModel = (): string =>
+  (typeof localStorage !== 'undefined' && localStorage.getItem('lexiai_model')) || 'gemini-3-flash-preview';
+
+const getAi = () => {
+  const key = getApiKey();
+  if (!key) throw new Error('No Gemini API key configured. Open Settings and paste your free key from aistudio.google.com/apikey.');
+  return new GoogleGenAI({ apiKey: key });
+};
+
+
 // Helper functions for audio decoding based on @google/genai guidelines
 function decode(base64: string) {
   const binaryString = atob(base64);
@@ -168,10 +184,10 @@ export const askAboutContext = async (
   question: string,
   history: { role: 'user' | 'model', text: string }[] = []
 ): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAi();
   try {
     const chat = ai.chats.create({
-      model: "gemini-3-flash-preview",
+      model: getTextModel(),
       config: {
         systemInstruction: `You are a world-class English Lexicographer and Stylistic Analyst. 
         You are assisting an advanced English learner via a side-bar interface.
@@ -204,10 +220,10 @@ export const askAboutContext = async (
 };
 
 export const lookupWord = async (word: string): Promise<WordEntry | null> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAi();
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview", 
+      model: getTextModel(), 
       contents: `Act as a world-class lexicographer. Your goal is to provide accurate entries for advanced English learners.
       
       CRITICAL ACCURACY CHECK:
@@ -236,10 +252,10 @@ export const lookupWord = async (word: string): Promise<WordEntry | null> => {
 };
 
 export const checkSentence = async (word: string, sentence: string): Promise<PracticeFeedback | null> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAi();
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: getTextModel(),
       contents: `Act as a constructive and encouraging English tutor for advanced learners.
       
       TARGET WORD: "${word}"
@@ -263,10 +279,10 @@ export const checkSentence = async (word: string, sentence: string): Promise<Pra
 };
 
 export const explainContext = async (word: string, sentence: string): Promise<ContextExplanation | null> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAi();
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: getTextModel(),
       contents: `Explain "${word}" specifically in the context of this sentence: "${sentence}"`,
       config: {
         responseMimeType: "application/json",
@@ -282,10 +298,10 @@ export const explainContext = async (word: string, sentence: string): Promise<Co
 };
 
 export const analyzeContextFromText = async (word: string, fullText: string): Promise<ContextExplanation | null> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAi();
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: getTextModel(),
       contents: `Word: "${word}". Text: "${fullText.substring(0, 8000)}". Task: Find the sentence where "${word}" appears and explain its specific meaning.`,
       config: {
         responseMimeType: "application/json",
@@ -301,7 +317,7 @@ export const analyzeContextFromText = async (word: string, fullText: string): Pr
 };
 
 export const playPronunciation = async (word: string): Promise<void> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAi();
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
@@ -335,10 +351,10 @@ export const playPronunciation = async (word: string): Promise<void> => {
 };
 
 export const analyzeVocabulary = async (text: string): Promise<VocabularySuggestion[]> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAi();
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: getTextModel(),
       contents: `Identify 5-10 advanced terms in: "${text.substring(0, 5000)}"`,
       config: {
         responseMimeType: "application/json",
@@ -354,10 +370,10 @@ export const analyzeVocabulary = async (text: string): Promise<VocabularySuggest
 };
 
 export const generatePodcastScript = async (words: string[]): Promise<PodcastScript> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAi();
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: getTextModel(),
       contents: `Create a casual, intellectually stimulating podcast script discussing these specific words: ${words.join(', ')}. 
       
       HOSTS: Alex and Jamie.
@@ -378,7 +394,7 @@ export const generatePodcastScript = async (words: string[]): Promise<PodcastScr
 };
 
 export const generatePodcastAudio = async (script: PodcastScript): Promise<ArrayBuffer> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAi();
   try {
     const prompt = script.dialogue.map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
     const response = await ai.models.generateContent({
@@ -406,10 +422,10 @@ export const generatePodcastAudio = async (script: PodcastScript): Promise<Array
 };
 
 export const compareSynonyms = async (word1: string, word2: string, word3?: string): Promise<SynonymComparison | null> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAi();
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: getTextModel(),
       contents: `Compare synonyms: ${word1}, ${word2}${word3 ? ', ' + word3 : ''}.`,
       config: {
         responseMimeType: "application/json",
@@ -425,10 +441,10 @@ export const compareSynonyms = async (word1: string, word2: string, word3?: stri
 };
 
 export const analyzeSentence = async (sentence: string): Promise<SentenceAnalysis | null> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAi();
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: getTextModel(),
       contents: `Break down advanced English sentence: "${sentence}".`,
       config: {
         responseMimeType: "application/json",
@@ -444,9 +460,9 @@ export const analyzeSentence = async (sentence: string): Promise<SentenceAnalysi
 };
 
 export const transcribeAudio = async (base64Audio: string, mimeType: string): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAi();
   const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
+    model: getTextModel(),
     contents: [{
       parts: [
         { inlineData: { data: base64Audio, mimeType } },

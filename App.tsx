@@ -7,7 +7,7 @@ import { Practice } from './components/Practice.tsx';
 import { Podcast } from './components/Podcast.tsx';
 import { Speaking, SpeakingKind } from './components/Speaking.tsx';
 import { WordEntry, ViewState, SrsRating, UserStats } from './types.ts';
-import { Book, GraduationCap, LayoutGrid, PenTool, X, Cloud, CloudOff, Loader2, Mic2, Database, Terminal, LogOut, Download, Upload, Flame } from 'lucide-react';
+import { Book, GraduationCap, LayoutGrid, PenTool, X, Cloud, CloudOff, Loader2, Mic2, Database, Terminal, LogOut, Download, Upload, Flame, Settings as SettingsIcon } from 'lucide-react';
 import { localStorageService } from './services/localStorageService.ts';
 import { syncService } from './services/syncService.ts';
 import { cloudService } from './services/cloudService.ts';
@@ -15,6 +15,7 @@ import { supabase, isCloudConfigured } from './services/supabaseClient.ts';
 import { srsService } from './services/srsService.ts';
 import { statsService, levelForXp } from './services/statsService.ts';
 import { ProgressPanel } from './components/ProgressPanel.tsx';
+import { Settings } from './components/Settings.tsx';
 import type { Session } from '@supabase/supabase-js';
 
 const App: React.FC = () => {
@@ -40,6 +41,7 @@ const App: React.FC = () => {
 
   const [stats, setStats] = useState<UserStats>(() => statsService.get());
   const [showProgress, setShowProgress] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const refreshFromLocal = () => {
     const localWordsMap = localStorageService.getAllWords();
@@ -280,6 +282,13 @@ const App: React.FC = () => {
               {accountLabel}
             </button>
             <button
+              onClick={() => setShowSettings(true)}
+              className="p-2 rounded-lg text-stone-400 hover:text-stone-900 transition-colors"
+              title="Settings"
+            >
+               <SettingsIcon className="w-4 h-4" />
+            </button>
+            <button
               onClick={() => setShowDebug(!showDebug)}
               className={`p-2 rounded-lg transition-colors ${showDebug ? 'bg-stone-800 text-white' : 'text-stone-300 hover:text-stone-900'}`}
               title="Debug Sync"
@@ -384,6 +393,7 @@ const App: React.FC = () => {
       )}
 
       {showProgress && <ProgressPanel stats={stats} words={savedWords} onClose={() => setShowProgress(false)} />}
+      {showSettings && <Settings onClose={() => setShowSettings(false)} />}
 
       <main className="max-w-5xl mx-auto px-4 py-12">
         {view === ViewState.DICTIONARY && <Dictionary onSave={handleSaveWord} savedWords={savedWords} />}
