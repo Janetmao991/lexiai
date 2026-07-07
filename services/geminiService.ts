@@ -14,7 +14,8 @@ export const getTextModel = (): string =>
 const getAi = () => {
   const key = getApiKey();
   if (!key) throw new Error('No Gemini API key configured. Open Settings and paste your free key from aistudio.google.com/apikey.');
-  return new GoogleGenAI({ apiKey: key });
+  // 45s cap so a congested free-tier request fails visibly instead of spinning forever.
+  return new GoogleGenAI({ apiKey: key, httpOptions: { timeout: 45000 } });
 };
 
 

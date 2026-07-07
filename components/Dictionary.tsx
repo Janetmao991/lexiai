@@ -46,8 +46,15 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords }) =>
       const data = await lookupWord(query);
       if (data) setLookupResult(data);
       else setError('No results found.');
-    } catch (err) {
-      setError('Connection failed.');
+    } catch (err: any) {
+      const msg = String(err?.message || '');
+      if (/timeout|deadline|aborted/i.test(msg)) {
+        setError('The AI took too long to answer (free-tier congestion). Please try again.');
+      } else if (/API key/i.test(msg)) {
+        setError(msg);
+      } else {
+        setError('Connection failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
