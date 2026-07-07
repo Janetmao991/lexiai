@@ -72,6 +72,7 @@ export const titleForLevel = (level: number): string => {
 const emptyDaily = (): DailyProgress => ({
   date: todayStr(),
   reviews: 0,
+  newCards: 0,
   practices: 0,
   savedWords: 0,
   podcasts: 0,
@@ -135,6 +136,13 @@ const touchStreak = (stats: UserStats) => {
 
 export const statsService = {
   get: (): UserStats => load(),
+
+  /** Count a brand-new card entering the SRS rotation today. */
+  recordNewCard: () => {
+    const stats = load();
+    stats.daily.newCards += 1;
+    persist(stats);
+  },
 
   subscribe: (fn: Listener): (() => void) => {
     listeners.add(fn);

@@ -122,6 +122,7 @@ const App: React.FC = () => {
   const allWords = () => Object.values(localStorageService.getAllWords());
 
   const handleReview = (entry: WordEntry, rating: SrsRating) => {
+    if (!entry.srs) statsService.recordNewCard(); // first time in rotation counts against today's new-card budget
     const updated: WordEntry = { ...entry, srs: srsService.schedule(entry.srs, rating) };
     handleSaveWord(updated);
     statsService.record('review', allWords());
@@ -143,6 +144,17 @@ const App: React.FC = () => {
       handleSaveWord({ ...word, mastery: { ...word.mastery, speakingPassed: true } });
     }
     if (passed) statsService.record('speaking', allWords());
+  };
+
+  const handleConversationDone = (usedWellWords: string[], _score: number) => {
+    const wordsMap = localStorageService.getAllWords();
+    for (const name of usedWellWords) {
+      const entry = Object.values(wordsMap).find(w => w.word.toLowerCase() === name.toLowerCase());
+      if (entry && !entry.mastery?.speakingPassed) {
+        handleSaveWord({ ...entry, mastery: { ...entry.mastery, speakingPassed: true } });
+      }
+    }
+    statsService.record('speaking', allWords());
   };
 
   const handleDeleteWord = async (wordId: string) => {
@@ -416,9 +428,9 @@ const App: React.FC = () => {
       <main className="max-w-5xl mx-auto px-4 py-12">
         {view === ViewState.DICTIONARY && <Dictionary onSave={handleSaveWord} savedWords={savedWords} />}
         {view === ViewState.NOTEBOOK && <Notebook words={savedWords} onDelete={handleDeleteWord} onPractice={(w) => { setPracticeTarget(w); setView(ViewState.PRACTICE); }} onUpdateWord={handleSaveWord} />}
-        {view === ViewState.FLASHCARDS && <Flashcards words={savedWords} onReview={handleReview} onGameComplete={handleGameComplete} />}
+        {view === ViewState.FLASHCARDS && <Flashcards words={savedWords} onReview={handleReview} onGameComplete={handleGameComplete} newCardsToday={stats.daily.newCards ?? 0} />}
         {view === ViewState.PRACTICE && <Practice initialWord={practiceTarget} words={savedWords} onScored={handlePracticeScored} />}
-        {view === ViewState.SPEAKING && <Speaking words={savedWords} onExerciseDone={handleSpeakingDone} />}
+        {view === ViewState.SPEAKING && <Speaking words={savedWords} onExerciseDone={handleSpeakingDone} onConversationDone={handleConversationDone} />}
         {view === ViewState.PODCAST && <Podcast words={savedWords} onGenerated={handlePodcastGenerated} />}
       </main>
     </div>

@@ -473,3 +473,122 @@ export const transcribeAudio = async (base64Audio: string, mimeType: string): Pr
   });
   return (response.text || '').trim();
 };
+
+// ---------- Conversation practice ----------
+
+export interface ConversationPlan {
+  topic: string;
+  words: string[];
+  opener: string;
+}
+
+export interface ConversationWordFeedback {
+  word: string;
+  used: boolean;
+  usedWell: boolean;
+  comment: string;
+}
+
+export interface ConversationFeedback {
+  overall: string;
+  score: number;
+  wordFeedback: ConversationWordFeedback[];
+}
+
+const conversationPlanSchema = {
+  type: Type.OBJECT,
+  properties: {
+    topic: { type: Type.STRING },
+    words: { type: Type.ARRAY, items: { type: Type.STRING } },
+    opener: { type: Type.STRING },
+  },
+  required: ["topic", "words", "opener"],
+};
+
+const conversationFeedbackSchema = {
+  type: Type.OBJECT,
+  properties: {
+    overall: { type: Type.STRING },
+    score: { type: Type.NUMBER },
+    wordFeedback: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          word: { type: Type.STRING },
+          used: { type: Type.BOOLEAN },
+          usedWell: { type: Type.BOOLEAN },
+          comment: { type: Type.STRING },
+        },
+        required: ["word", "used", "usedWell", "comment"],
+      },
+    },
+  },
+  required: ["overall", "score", "wordFeedback"],
+};
+
+/** Pick 3-5 words from the candidates that shine in spoken English, plus a topic to anchor them. */
+export const planConversation = async (candidates: string[]): Promise<ConversationPlan> => {
+  const ai = getAi();
+  const response = await ai.models.generateContent({
+    model: getTextModel(),
+    contents: `From this vocabulary list, pick 3-5 words/phrases that are genuinely useful in everyday SPOKEN English conversation (prefer phrasal verbs, idioms and conversational words; avoid stiff academic or written-only terms):
+
+${candidates.join(', ')}
+
+Then invent one casual, concrete conversation topic where these words would come up naturally (e.g. career decisions, city life, a recent news story — not "vocabulary practice").
+Also write a warm 1-2 sentence conversation opener about that topic, ending with a question to the learner. Do NOT use any of the target words in the opener — leave them for the learner to discover.`,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: conversationPlanSchema,
+      temperature: 0.9,
+    },
+  });
+  return JSON.parse(response.text!);
+};
+
+/** Create a chat session for conversation practice. Caller keeps the returned chat and calls sendMessage. */
+export const createConversationChat = (plan: ConversationPlan) => {
+  const ai = getAi();
+  return ai.chats.create({
+    model: getTextModel(),
+    config: {
+      systemInstruction: `You are Alex, a friendly, curious conversation partner helping an advanced English learner practice SPEAKING vocabulary.
+
+TOPIC: ${plan.topic}
+TARGET WORDS the learner should get chances to use: ${plan.words.join(', ')}
+
+RULES:
+1. Keep each reply SHORT — 1-3 sentences, like real spoken conversation. Always end with a question or a hook that invites a reply.
+2. Steer the conversation so the target words become natural to use. You may use a target word yourself occasionally to model it, but mostly create openings for the learner.
+3. If the learner uses a target word incorrectly, gently recast it in your reply (say it the right way in passing) — do not lecture mid-conversation.
+4. Casual, warm, real. Contractions welcome. No bullet points, no markdown, no teacher-speak.`,
+      temperature: 0.9,
+    },
+  });
+};
+
+/** Grade the finished conversation: which target words were used, and how well. */
+export const gradeConversation = async (
+  transcript: { role: string; text: string }[],
+  targetWords: string[],
+): Promise<ConversationFeedback> => {
+  const ai = getAi();
+  const rendered = transcript.map(t => `${t.role === 'user' ? 'LEARNER' : 'ALEX'}: ${t.text}`).join('\n');
+  const response = await ai.models.generateContent({
+    model: getTextModel(),
+    contents: `Here is a conversation between an English learner (LEARNER) and a partner (ALEX).
+Target words the learner was trying to practice: ${targetWords.join(', ')}
+
+${rendered}
+
+For each target word, judge ONLY the LEARNER's usage: did they use it (or a close inflection), and was the usage natural and correct? Give a one-sentence comment each (praise what worked, or show a better phrasing).
+Then give an overall 2-3 sentence assessment of the learner's conversational English (fluency, naturalness, one concrete thing to improve) and a score out of 100.`,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: conversationFeedbackSchema,
+      temperature: 0.3,
+    },
+  });
+  return JSON.parse(response.text!);
+};

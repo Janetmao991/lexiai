@@ -9,9 +9,13 @@ interface FlashcardsProps {
   words: WordEntry[];
   onReview: (entry: WordEntry, rating: SrsRating) => void;
   onGameComplete: () => void;
+  newCardsToday: number;
 }
 
 type Mode = 'due' | 'all' | 'game';
+
+// New words enter the SRS rotation gradually so the due pile stays humane.
+export const DAILY_NEW_CARD_LIMIT = 20;
 
 const RATING_BUTTONS: { rating: SrsRating; label: string; classes: string }[] = [
   { rating: 'again', label: 'Forgot', classes: 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100' },
@@ -20,7 +24,7 @@ const RATING_BUTTONS: { rating: SrsRating; label: string; classes: string }[] = 
   { rating: 'easy', label: 'Easy', classes: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' },
 ];
 
-export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameComplete }) => {
+export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameComplete, newCardsToday }) => {
   const [mode, setMode] = useState<Mode>('due');
   const [browseIndex, setBrowseIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -28,7 +32,18 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
 
   // The due queue is recomputed from props; reviewed cards drop out on their own
   // because onReview updates the word's srs.due upstream.
-  const dueQueue = useMemo(() => srsService.dueWords(words), [words]);
+  // Learning cards (already in rotation) always show when due; brand-new cards
+  // trickle in at DAILY_NEW_CARD_LIMIT per day.
+  const { dueQueue, newCardsRemaining, newBacklog } = useMemo(() => {
+    const learningDue = words.filter(w => w.srs && srsService.isDue(w));
+    const fresh = words.filter(w => !w.srs);
+    const budget = Math.max(0, DAILY_NEW_CARD_LIMIT - newCardsToday);
+    return {
+      dueQueue: [...learningDue, ...fresh.slice(0, budget)],
+      newCardsRemaining: Math.min(budget, fresh.length),
+      newBacklog: fresh.length,
+    };
+  }, [words, newCardsToday]);
 
   if (words.length === 0) {
     return (
@@ -114,7 +129,9 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
           <h3 className="text-2xl font-serif font-bold text-stone-900">All caught up!</h3>
           <p className="text-stone-500">
             {sessionDone > 0 ? `${sessionDone} cards reviewed this session. ` : ''}
-            No cards due today. Come back tomorrow, or browse the full deck.
+            {newBacklog > 0
+              ? `Today's ${DAILY_NEW_CARD_LIMIT} new cards are done — ${newBacklog} more will trickle in over the coming days.`
+              : 'No cards due today. Come back tomorrow, or browse the full deck.'}
           </p>
           <button
             onClick={() => setMode('all')}
@@ -143,7 +160,9 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
           {masteryMeta.icon} {masteryMeta.label}
         </span>
         <span className="font-mono text-sm text-stone-400">
-          {mode === 'due' ? `${dueQueue.length} due` : `${(browseIndex % words.length) + 1} / ${words.length}`}
+          {mode === 'due'
+            ? `${dueQueue.length} due${newCardsRemaining > 0 ? ` (${newCardsRemaining} new)` : ''}`
+            : `${(browseIndex % words.length) + 1} / ${words.length}`}
         </span>
       </div>
 
@@ -193,6 +212,16 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
                   </div>
                 );
               })}
+              {currentCard.contexts && currentCard.contexts.length > 0 && (
+                <div className="border-t border-stone-800 pt-4 mt-2">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-stone-500 mb-2">
+                    Where you met it · {currentCard.contexts[0].sourceTitle}
+                  </p>
+                  <p className="text-sm font-serif italic text-stone-300 leading-relaxed">
+                    “{currentCard.contexts[0].targetSentence}”
+                  </p>
+                </div>
+              )}
             </div>
              <p className="absolute bottom-4 text-xs text-stone-600 uppercase tracking-widest font-semibold flex items-center gap-1">
                 <RotateCcw className="w-3 h-3" /> Flip

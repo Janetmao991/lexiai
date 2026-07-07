@@ -58,6 +58,7 @@ export interface WordEntry {
 export interface DailyProgress {
   date: string; // YYYY-MM-DD
   reviews: number;
+  newCards: number;
   practices: number;
   savedWords: number;
   podcasts: number;
