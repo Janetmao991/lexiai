@@ -1,9 +1,32 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { WordEntry } from '../types';
-import { planConversation, createConversationChat, gradeConversation, ConversationPlan, ConversationFeedback } from '../services/geminiService';
+import { planConversation, createConversationChat, gradeConversation, speakNatural, stopNaturalSpeech, ConversationPlan, ConversationFeedback } from '../services/geminiService';
 import { speechService, RecordingHandle } from '../services/speechService';
 import { Mic, Square, Send, Loader2, Volume2, VolumeX, Flag, CheckCircle2, XCircle, RotateCcw, Award } from 'lucide-react';
+
+// Gemini neural voice first; browser TTS as quota/network fallback.
+const speakReply = async (text: string) => {
+  try {
+    await speakNatural(text);
+  } catch (e) {
+    console.warn('[TTS] Gemini voice unavailable, falling back to browser voice', e);
+    await speechService.speak(text, 1);
+  }
+};
+
+const stopAllSpeech = () => {
+  stopNaturalSpeech();
+  speechService.stopSpeaking();
+};
+
+// Gemini errors arrive as raw JSON blobs; turn the common ones into human sentences.
+const friendlyError = (raw: string): string => {
+  if (/503|high demand|overloaded/i.test(raw)) return 'The AI service is briefly overloaded — wait a few seconds and try again.';
+  if (/429|RESOURCE_EXHAUSTED|quota/i.test(raw)) return 'Free-tier rate limit reached — take a short break and try again in a minute.';
+  if (/API key/i.test(raw)) return raw; // our own message, already friendly
+  return 'Something went wrong talking to the AI. Please try again.';
+};
 
 interface ConversationProps {
   words: WordEntry[];
@@ -49,16 +72,16 @@ export const Conversation: React.FC<ConversationProps> = ({ words, onFinished })
       chatRef.current = createConversationChat(newPlan);
       setMessages([{ role: 'model', text: newPlan.opener }]);
       setPhase('chatting');
-      if (voiceOnRef.current) speechService.speak(newPlan.opener, 1);
+      if (voiceOnRef.current) speakReply(newPlan.opener);
     } catch (e: any) {
-      setError(e.message || 'Failed to start the conversation.');
+      setError(friendlyError(e.message || 'Failed to start the conversation.'));
       setPhase('error');
     }
   };
 
   useEffect(() => {
     startSession();
-    return () => { recRef.current?.cancel(); speechService.stopSpeaking(); };
+    return () => { recRef.current?.cancel(); stopAllSpeech(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -82,14 +105,14 @@ export const Conversation: React.FC<ConversationProps> = ({ words, onFinished })
     setInput('');
     setMessages(prev => [...prev, { role: 'user', text: trimmed }]);
     setSending(true);
-    speechService.stopSpeaking();
+    stopAllSpeech();
     try {
       const response = await chatRef.current.sendMessage({ message: trimmed });
       const reply = response.text || '…';
       setMessages(prev => [...prev, { role: 'model', text: reply }]);
-      if (voiceOnRef.current) speechService.speak(reply, 1);
+      if (voiceOnRef.current) speakReply(reply);
     } catch (e: any) {
-      setError(e.message || 'Message failed — try again.');
+      setError(friendlyError(e.message || 'Message failed — try again.'));
     } finally {
       setSending(false);
     }
@@ -122,14 +145,14 @@ export const Conversation: React.FC<ConversationProps> = ({ words, onFinished })
   const finish = async () => {
     if (!plan) return;
     setPhase('grading');
-    speechService.stopSpeaking();
+    stopAllSpeech();
     try {
       const result = await gradeConversation(messages, plan.words);
       setFeedback(result);
       setPhase('done');
       onFinished(result.wordFeedback.filter(f => f.usedWell).map(f => f.word), result.score);
     } catch (e: any) {
-      setError(e.message || 'Grading failed.');
+      setError(friendlyError(e.message || 'Grading failed.'));
       setPhase('chatting');
     }
   };

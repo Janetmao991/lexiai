@@ -592,3 +592,51 @@ Then give an overall 2-3 sentence assessment of the learner's conversational Eng
   });
   return JSON.parse(response.text!);
 };
+
+// ---------- Natural TTS for conversation (Gemini voice, warm + human) ----------
+
+let activeSpeech: { ctx: AudioContext; source: AudioBufferSourceNode } | null = null;
+
+export const stopNaturalSpeech = () => {
+  if (activeSpeech) {
+    try { activeSpeech.source.stop(); activeSpeech.ctx.close(); } catch { /* already stopped */ }
+    activeSpeech = null;
+  }
+};
+
+/**
+ * Speak text with Gemini's neural TTS (far more natural than the browser voice).
+ * Resolves when playback finishes. Throws on quota/network errors so the
+ * caller can fall back to browser speechSynthesis.
+ */
+export const speakNatural = async (text: string): Promise<void> => {
+  const ai = getAi();
+  const response = await ai.models.generateContent({
+    model: "gemini-2.5-flash-preview-tts",
+    contents: [{ parts: [{ text: `Say this warmly and conversationally, like chatting with a friend: ${text}` }] }],
+    config: {
+      responseModalities: [Modality.AUDIO],
+      speechConfig: {
+        voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Puck' } },
+      },
+    },
+  });
+  const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+  if (!base64Audio) throw new Error('No audio returned');
+
+  stopNaturalSpeech();
+  const AudioContextClass = (window as any).AudioContext || (window as any).webkitAudioContext;
+  const ctx = new AudioContextClass({ sampleRate: 24000 });
+  const buffer = await decodeAudioData(decode(base64Audio), ctx, 24000, 1);
+  return new Promise<void>(resolve => {
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(ctx.destination);
+    activeSpeech = { ctx, source };
+    source.onended = () => {
+      if (activeSpeech?.source === source) { try { ctx.close(); } catch { /* noop */ } activeSpeech = null; }
+      resolve();
+    };
+    source.start();
+  });
+};
