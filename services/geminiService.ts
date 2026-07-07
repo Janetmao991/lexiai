@@ -1,5 +1,5 @@
 
-import { GoogleGenAI, Type, Modality } from "@google/genai";
+import { GoogleGenAI, Type, Modality, ThinkingLevel } from "@google/genai";
 import { WordEntry, PracticeFeedback, ContextExplanation, VocabularySuggestion, PodcastScript, SynonymComparison, SentenceAnalysis } from "../types";
 
 // ---- BYOK: the Gemini key lives in this browser only ----
@@ -189,6 +189,7 @@ export const askAboutContext = async (
     const chat = ai.chats.create({
       model: getTextModel(),
       config: {
+        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
         systemInstruction: `You are a world-class English Lexicographer and Stylistic Analyst. 
         You are assisting an advanced English learner via a side-bar interface.
         
@@ -234,6 +235,7 @@ export const lookupWord = async (word: string): Promise<WordEntry | null> => {
       4. ESSENTIAL: Provide 4-6 natural collocations for each definition.
       5. FINANCIAL FOCUS: If the word has a specific meaning in Finance, Business, or Economics, ENSURE you include that definition and set the partOfSpeech to exactly "Noun (Finance)", "Verb (Finance)", etc.`,
       config: {
+        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
         responseMimeType: "application/json",
         responseSchema: dictionarySchema,
         temperature: 0.1,
@@ -266,6 +268,7 @@ export const checkSentence = async (word: string, sentence: string): Promise<Pra
       2. SEMANTIC FOCUS: Only give a low score (below 60) if the user fundamentally misunderstood the word "${word}" or used it in a nonsensical way.
       3. FEEDBACK: Confirm if the word usage was semantically sound. Praise correct context usage.`,
       config: {
+        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
         responseMimeType: "application/json",
         responseSchema: practiceSchema,
         temperature: 0.5,
@@ -285,6 +288,7 @@ export const explainContext = async (word: string, sentence: string): Promise<Co
       model: getTextModel(),
       contents: `Explain "${word}" specifically in the context of this sentence: "${sentence}"`,
       config: {
+        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
         responseMimeType: "application/json",
         responseSchema: contextSchema,
         temperature: 0.3,
@@ -304,6 +308,7 @@ export const analyzeContextFromText = async (word: string, fullText: string): Pr
       model: getTextModel(),
       contents: `Word: "${word}". Text: "${fullText.substring(0, 8000)}". Task: Find the sentence where "${word}" appears and explain its specific meaning.`,
       config: {
+        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
         responseMimeType: "application/json",
         responseSchema: contextSchema,
         temperature: 0.2
@@ -357,6 +362,7 @@ export const analyzeVocabulary = async (text: string): Promise<VocabularySuggest
       model: getTextModel(),
       contents: `Identify 5-10 advanced terms in: "${text.substring(0, 5000)}"`,
       config: {
+        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
         responseMimeType: "application/json",
         responseSchema: vocabularySuggestionsSchema,
         temperature: 0.3
@@ -380,6 +386,7 @@ export const generatePodcastScript = async (words: string[]): Promise<PodcastScr
       REQUIREMENT: Each speaker should use at least 2 of the target words naturally in their dialogue.
       STYLE: Sophisticated but conversational, like an NPR or TED podcast.`,
       config: {
+        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
         responseMimeType: "application/json",
         responseSchema: podcastScriptSchema,
         temperature: 0.7
@@ -428,6 +435,7 @@ export const compareSynonyms = async (word1: string, word2: string, word3?: stri
       model: getTextModel(),
       contents: `Compare synonyms: ${word1}, ${word2}${word3 ? ', ' + word3 : ''}.`,
       config: {
+        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
         responseMimeType: "application/json",
         responseSchema: synonymComparisonSchema,
         temperature: 0.3
@@ -447,6 +455,7 @@ export const analyzeSentence = async (sentence: string): Promise<SentenceAnalysi
       model: getTextModel(),
       contents: `Break down advanced English sentence: "${sentence}".`,
       config: {
+        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
         responseMimeType: "application/json",
         responseSchema: sentenceAnalysisSchema,
         temperature: 0.3
@@ -469,7 +478,7 @@ export const transcribeAudio = async (base64Audio: string, mimeType: string): Pr
         { text: "Transcribe this English speech verbatim. Return ONLY the transcribed words, no punctuation commentary, no quotes, no explanations. If there is no intelligible speech, return an empty string." },
       ],
     }],
-    config: { temperature: 0 },
+    config: { thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL }, temperature: 0 },
   });
   return (response.text || '').trim();
 };
@@ -539,6 +548,7 @@ ${candidates.join(', ')}
 Then invent one casual, concrete conversation topic where these words would come up naturally (e.g. career decisions, city life, a recent news story — not "vocabulary practice").
 Also write a warm 1-2 sentence conversation opener about that topic, ending with a question to the learner. Do NOT use any of the target words in the opener — leave them for the learner to discover.`,
     config: {
+      thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
       responseMimeType: "application/json",
       responseSchema: conversationPlanSchema,
       temperature: 0.9,
@@ -553,6 +563,7 @@ export const createConversationChat = (plan: ConversationPlan) => {
   return ai.chats.create({
     model: getTextModel(),
     config: {
+      thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
       systemInstruction: `You are Alex, a friendly, curious conversation partner helping an advanced English learner practice SPEAKING vocabulary.
 
 TOPIC: ${plan.topic}
@@ -585,6 +596,7 @@ ${rendered}
 For each target word, judge ONLY the LEARNER's usage: did they use it (or a close inflection), and was the usage natural and correct? Give a one-sentence comment each (praise what worked, or show a better phrasing).
 Then give an overall 2-3 sentence assessment of the learner's conversational English (fluency, naturalness, one concrete thing to improve) and a score out of 100.`,
     config: {
+      thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
       responseMimeType: "application/json",
       responseSchema: conversationFeedbackSchema,
       temperature: 0.3,
