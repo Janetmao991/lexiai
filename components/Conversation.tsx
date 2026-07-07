@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { WordEntry } from '../types';
 import { planConversation, createConversationChat, gradeConversation, speakNatural, stopNaturalSpeech, ConversationPlan, ConversationFeedback } from '../services/geminiService';
 import { speechService, RecordingHandle } from '../services/speechService';
-import { Mic, Square, Send, Loader2, Volume2, VolumeX, Flag, CheckCircle2, XCircle, RotateCcw, Award } from 'lucide-react';
+import { Mic, Square, Send, Loader2, Volume2, VolumeX, Flag, CheckCircle2, XCircle, RotateCcw, Award, Shuffle } from 'lucide-react';
 
 // Gemini neural voice first; browser TTS as quota/network fallback.
 const speakReply = async (text: string) => {
@@ -184,7 +184,21 @@ export const Conversation: React.FC<ConversationProps> = ({ words, onFinished })
         <div className="bg-white p-6 rounded-xl shadow-sm border border-stone-100 flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-1">Today's Topic</p>
-            <p className="font-serif font-bold text-stone-900">{plan.topic}</p>
+            <div className="flex items-center gap-3">
+              <p className="font-serif font-bold text-stone-900">{plan.topic}</p>
+              <button
+                onClick={() => {
+                  if (userTurns > 0 && !window.confirm('Switch topic? This starts a fresh conversation with new target words.')) return;
+                  stopAllSpeech();
+                  startSession();
+                }}
+                disabled={phase === 'grading'}
+                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-stone-200 bg-stone-50 text-xs font-bold text-stone-500 hover:text-stone-900 hover:border-stone-400 transition-all disabled:opacity-40"
+                title="New topic, new words"
+              >
+                <Shuffle className="w-3 h-3" /> New Topic
+              </button>
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
             {plan.words.map(w => (
