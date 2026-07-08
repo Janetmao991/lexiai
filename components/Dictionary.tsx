@@ -48,7 +48,9 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords }) =>
       else setError('No results found.');
     } catch (err: any) {
       const msg = String(err?.message || '');
-      if (/timeout|deadline|aborted/i.test(msg)) {
+      if (/429|RESOURCE_EXHAUSTED|quota/i.test(msg)) {
+        setError('Free-tier quota reached for now. Wait a minute and retry — or if it persists, today\'s allowance is used up (resets at midnight PT).');
+      } else if (/timeout|deadline|aborted/i.test(msg)) {
         setError('The AI took too long to answer (free-tier congestion). Please try again.');
       } else if (/API key/i.test(msg)) {
         setError(msg);

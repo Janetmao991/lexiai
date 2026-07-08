@@ -1,5 +1,5 @@
 
-import { GoogleGenAI, Type, Modality, ThinkingLevel } from "@google/genai";
+import { GoogleGenAI, Type, Modality, ThinkingLevel, GenerateContentParameters, GenerateContentResponse } from "@google/genai";
 import { WordEntry, PracticeFeedback, ContextExplanation, VocabularySuggestion, PodcastScript, SynonymComparison, SentenceAnalysis } from "../types";
 
 // ---- BYOK: the Gemini key lives in this browser only ----
@@ -16,6 +16,26 @@ const getAi = () => {
   if (!key) throw new Error('No Gemini API key configured. Open Settings and paste your free key from aistudio.google.com/apikey.');
   // 45s cap so a congested free-tier request fails visibly instead of spinning forever.
   return new GoogleGenAI({ apiKey: key, httpOptions: { timeout: 45000 } });
+};
+
+// Free-tier Gemini throws transient 503/429 blips; retry those quietly before
+// surfacing an error to the UI.
+const TRANSIENT = /503|UNAVAILABLE|overloaded|high demand|fetch failed|network/i;
+const generateWithRetry = async (ai: GoogleGenAI, params: GenerateContentParameters, tries = 3): Promise<GenerateContentResponse> => {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < tries; attempt++) {
+    try {
+      return await ai.models.generateContent(params);
+    } catch (e: any) {
+      lastError = e;
+      if (attempt < tries - 1 && TRANSIENT.test(String(e?.message || ''))) {
+        await new Promise(r => setTimeout(r, 1200 * (attempt + 1)));
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw lastError;
 };
 
 
@@ -224,7 +244,7 @@ export const askAboutContext = async (
 export const lookupWord = async (word: string): Promise<WordEntry | null> => {
   const ai = getAi();
   try {
-    const response = await ai.models.generateContent({
+    const response = await generateWithRetry(ai, {
       model: getTextModel(), 
       contents: `Act as a world-class lexicographer. Your goal is to provide accurate entries for advanced English learners.
       
@@ -257,7 +277,7 @@ export const lookupWord = async (word: string): Promise<WordEntry | null> => {
 export const checkSentence = async (word: string, sentence: string): Promise<PracticeFeedback | null> => {
   const ai = getAi();
   try {
-    const response = await ai.models.generateContent({
+    const response = await generateWithRetry(ai, {
       model: getTextModel(),
       contents: `Act as a constructive and encouraging English tutor for advanced learners.
       
@@ -285,7 +305,7 @@ export const checkSentence = async (word: string, sentence: string): Promise<Pra
 export const explainContext = async (word: string, sentence: string): Promise<ContextExplanation | null> => {
   const ai = getAi();
   try {
-    const response = await ai.models.generateContent({
+    const response = await generateWithRetry(ai, {
       model: getTextModel(),
       contents: `Explain "${word}" specifically in the context of this sentence: "${sentence}"`,
       config: {
@@ -305,7 +325,7 @@ export const explainContext = async (word: string, sentence: string): Promise<Co
 export const analyzeContextFromText = async (word: string, fullText: string): Promise<ContextExplanation | null> => {
   const ai = getAi();
   try {
-    const response = await ai.models.generateContent({
+    const response = await generateWithRetry(ai, {
       model: getTextModel(),
       contents: `Word: "${word}". Text: "${fullText.substring(0, 8000)}". Task: Find the sentence where "${word}" appears and explain its specific meaning.`,
       config: {
@@ -325,7 +345,7 @@ export const analyzeContextFromText = async (word: string, fullText: string): Pr
 export const playPronunciation = async (word: string): Promise<void> => {
   const ai = getAi();
   try {
-    const response = await ai.models.generateContent({
+    const response = await generateWithRetry(ai, {
       model: "gemini-2.5-flash-preview-tts",
       contents: [{ parts: [{ text: word }] }],
       config: {
@@ -359,7 +379,7 @@ export const playPronunciation = async (word: string): Promise<void> => {
 export const analyzeVocabulary = async (text: string): Promise<VocabularySuggestion[]> => {
   const ai = getAi();
   try {
-    const response = await ai.models.generateContent({
+    const response = await generateWithRetry(ai, {
       model: getTextModel(),
       contents: `Identify 5-10 advanced terms in: "${text.substring(0, 5000)}"`,
       config: {
@@ -379,7 +399,7 @@ export const analyzeVocabulary = async (text: string): Promise<VocabularySuggest
 export const generatePodcastScript = async (words: string[]): Promise<PodcastScript> => {
   const ai = getAi();
   try {
-    const response = await ai.models.generateContent({
+    const response = await generateWithRetry(ai, {
       model: getTextModel(),
       contents: `Create a casual, intellectually stimulating podcast script discussing these specific words: ${words.join(', ')}. 
       
@@ -405,7 +425,7 @@ export const generatePodcastAudio = async (script: PodcastScript): Promise<Array
   const ai = getAi();
   try {
     const prompt = script.dialogue.map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
-    const response = await ai.models.generateContent({
+    const response = await generateWithRetry(ai, {
       model: "gemini-2.5-flash-preview-tts",
       contents: [{ parts: [{ text: prompt }] }],
       config: {
@@ -432,7 +452,7 @@ export const generatePodcastAudio = async (script: PodcastScript): Promise<Array
 export const compareSynonyms = async (word1: string, word2: string, word3?: string): Promise<SynonymComparison | null> => {
   const ai = getAi();
   try {
-    const response = await ai.models.generateContent({
+    const response = await generateWithRetry(ai, {
       model: getTextModel(),
       contents: `Compare synonyms: ${word1}, ${word2}${word3 ? ', ' + word3 : ''}.`,
       config: {
@@ -452,7 +472,7 @@ export const compareSynonyms = async (word1: string, word2: string, word3?: stri
 export const analyzeSentence = async (sentence: string): Promise<SentenceAnalysis | null> => {
   const ai = getAi();
   try {
-    const response = await ai.models.generateContent({
+    const response = await generateWithRetry(ai, {
       model: getTextModel(),
       contents: `Break down advanced English sentence: "${sentence}".`,
       config: {
@@ -471,7 +491,7 @@ export const analyzeSentence = async (sentence: string): Promise<SentenceAnalysi
 
 export const transcribeAudio = async (base64Audio: string, mimeType: string): Promise<string> => {
   const ai = getAi();
-  const response = await ai.models.generateContent({
+  const response = await generateWithRetry(ai, {
     model: getTextModel(),
     contents: [{
       parts: [
@@ -540,7 +560,7 @@ const conversationFeedbackSchema = {
 /** Pick 3-5 words from the candidates that shine in spoken English, plus a topic to anchor them. */
 export const planConversation = async (candidates: string[]): Promise<ConversationPlan> => {
   const ai = getAi();
-  const response = await ai.models.generateContent({
+  const response = await generateWithRetry(ai, {
     model: getTextModel(),
     contents: `From this vocabulary list, pick 3-5 words/phrases that are genuinely useful in everyday SPOKEN English conversation (prefer phrasal verbs, idioms and conversational words; avoid stiff academic or written-only terms):
 
@@ -587,7 +607,7 @@ export const gradeConversation = async (
 ): Promise<ConversationFeedback> => {
   const ai = getAi();
   const rendered = transcript.map(t => `${t.role === 'user' ? 'LEARNER' : 'ALEX'}: ${t.text}`).join('\n');
-  const response = await ai.models.generateContent({
+  const response = await generateWithRetry(ai, {
     model: getTextModel(),
     contents: `Here is a conversation between an English learner (LEARNER) and a partner (ALEX).
 Target words the learner was trying to practice: ${targetWords.join(', ')}
@@ -624,7 +644,7 @@ export const stopNaturalSpeech = () => {
  */
 export const speakNatural = async (text: string): Promise<void> => {
   const ai = getAi();
-  const response = await ai.models.generateContent({
+  const response = await generateWithRetry(ai, {
     model: "gemini-2.5-flash-preview-tts",
     contents: [{ parts: [{ text: `Say this warmly and conversationally, like chatting with a friend: ${text}` }] }],
     config: {
