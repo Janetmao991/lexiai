@@ -2,17 +2,23 @@
 import React, { useState, useMemo } from 'react';
 import { WordEntry, SrsRating } from '../types';
 import { srsService, MASTERY_META } from '../services/srsService';
-import { RotateCcw, ChevronLeft, ChevronRight, CheckCircle2, Layers, Gamepad2, CalendarClock } from 'lucide-react';
+import { RotateCcw, ChevronLeft, ChevronRight, CheckCircle2, Layers, Gamepad2, CalendarClock, Keyboard } from 'lucide-react';
 import { SynonymMatch } from './SynonymMatch';
+import { SpellingBee } from './SpellingBee';
 
 interface FlashcardsProps {
   words: WordEntry[];
   onReview: (entry: WordEntry, rating: SrsRating) => void;
   onGameComplete: () => void;
+  onSpellCorrect: () => void;
   newCardsToday: number;
 }
 
-type Mode = 'due' | 'all' | 'game';
+type Mode = 'due' | 'all' | 'spell' | 'game';
+
+// Familiar cards flip direction: definition first, recall the word.
+// Active recall in the production direction is what speaking draws on.
+const isReverseCard = (w: WordEntry) => (w.srs?.reps ?? 0) >= 2 && (w.srs!.reps % 2 === 0);
 
 // New words enter the SRS rotation gradually so the due pile stays humane.
 export const DAILY_NEW_CARD_LIMIT = 20;
@@ -24,7 +30,7 @@ const RATING_BUTTONS: { rating: SrsRating; label: string; classes: string }[] = 
   { rating: 'easy', label: 'Easy', classes: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' },
 ];
 
-export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameComplete, newCardsToday }) => {
+export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameComplete, onSpellCorrect, newCardsToday }) => {
   const [mode, setMode] = useState<Mode>('due');
   const [browseIndex, setBrowseIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -90,6 +96,7 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
       {([
         { id: 'due', label: 'Due Today', icon: <CalendarClock className="w-3.5 h-3.5" /> },
         { id: 'all', label: 'Browse All', icon: <Layers className="w-3.5 h-3.5" /> },
+        { id: 'spell', label: 'Spelling', icon: <Keyboard className="w-3.5 h-3.5" /> },
         { id: 'game', label: 'Match Game', icon: <Gamepad2 className="w-3.5 h-3.5" /> },
       ] as { id: Mode; label: string; icon: React.ReactNode }[]).map(m => (
         <button
@@ -113,6 +120,18 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
           {renderModeSwitch()}
         </div>
         <SynonymMatch words={words} onComplete={onGameComplete} />
+      </div>
+    );
+  }
+
+  if (mode === 'spell') {
+    return (
+      <div className="max-w-xl mx-auto flex flex-col items-center space-y-8 py-8">
+        <div className="w-full flex justify-between items-center px-2">
+          <h2 className="text-2xl font-serif font-bold text-stone-800">Spelling</h2>
+          {renderModeSwitch()}
+        </div>
+        <SpellingBee words={words} onCorrect={onSpellCorrect} />
       </div>
     );
   }
@@ -146,6 +165,9 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
 
   const fontSizeClass = getDynamicFontSize(currentCard.word);
   const masteryMeta = MASTERY_META[srsService.masteryLevel(currentCard)];
+  const reversed = mode === 'due' && isReverseCard(currentCard);
+  const firstDef = currentCard.meanings?.[0]?.definitions?.[0]?.definition || '';
+  const firstPos = currentCard.meanings?.[0]?.partOfSpeech || '';
 
   return (
     <div className="max-w-xl mx-auto flex flex-col items-center space-y-8 py-8">
@@ -173,23 +195,50 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
       >
         <div className={`relative w-full h-full duration-700 transform-style-3d transition-all ${isFlipped ? 'rotate-y-180' : ''}`}>
 
-          {/* Front Side (Word) */}
+          {/* Front Side (word — or definition when the card runs in reverse) */}
           <div className="absolute w-full h-full bg-white rounded-xl shadow-lg border border-stone-100 p-8 flex flex-col items-center justify-center backface-hidden">
-             <div className="text-center space-y-4 w-full px-4">
-                <h2 className={`${fontSizeClass} font-serif font-bold text-stone-900 capitalize tracking-tight`}>
-                  {currentCard.word}
-                </h2>
-                <span className="inline-block text-lg text-stone-400 font-mono">
-                  /{currentCard.ipa}/
-                </span>
-             </div>
+             {reversed ? (
+               <div className="text-center space-y-4 w-full px-4">
+                  <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-full border bg-amber-50 text-amber-700 border-amber-100 inline-block">
+                    Reverse · What's the word?
+                  </span>
+                  <p className="text-xl md:text-2xl font-serif italic text-stone-800 leading-relaxed">“{firstDef}”</p>
+                  <p className="text-sm text-stone-400">
+                    {firstPos} · starts with <span className="font-bold text-stone-600 uppercase">{currentCard.word[0]}</span>
+                  </p>
+               </div>
+             ) : (
+               <div className="text-center space-y-4 w-full px-4">
+                  <h2 className={`${fontSizeClass} font-serif font-bold text-stone-900 capitalize tracking-tight`}>
+                    {currentCard.word}
+                  </h2>
+                  <span className="inline-block text-lg text-stone-400 font-mono">
+                    /{currentCard.ipa}/
+                  </span>
+               </div>
+             )}
              <p className="absolute bottom-6 text-xs text-stone-300 uppercase tracking-widest font-semibold">
                 Tap to reveal
              </p>
           </div>
 
-          {/* Back Side (Definition) */}
+          {/* Back Side (definition — or the word when the card runs in reverse) */}
           <div className="absolute w-full h-full bg-stone-900 rounded-xl shadow-xl border border-stone-800 p-8 flex flex-col items-center justify-center backface-hidden rotate-y-180 text-stone-200">
+            {reversed ? (
+              <div className="text-center space-y-4 w-full px-4">
+                <h2 className={`${fontSizeClass} font-serif font-bold text-white capitalize tracking-tight`}>
+                  {currentCard.word}
+                </h2>
+                <span className="inline-block text-lg text-stone-400 font-mono">
+                  /{currentCard.ipa}/
+                </span>
+                {currentCard.contexts && currentCard.contexts.length > 0 && (
+                  <p className="text-sm font-serif italic text-stone-400 leading-relaxed pt-4 border-t border-stone-800">
+                    “{currentCard.contexts[0].targetSentence}”
+                  </p>
+                )}
+              </div>
+            ) : (
             <div className="space-y-6 text-center overflow-y-auto max-h-full scrollbar-hide w-full px-2 pb-6">
               {currentCard.meanings.map((m, i) => {
                 const financeStyle = isFinance(m.partOfSpeech);
@@ -223,6 +272,7 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
                 </div>
               )}
             </div>
+            )}
              <p className="absolute bottom-4 text-xs text-stone-600 uppercase tracking-widest font-semibold flex items-center gap-1">
                 <RotateCcw className="w-3 h-3" /> Flip
              </p>

@@ -137,6 +137,7 @@ const App: React.FC = () => {
   };
 
   const handleGameComplete = () => statsService.record('game', allWords());
+  const handleSpellCorrect = () => statsService.record('review', allWords());
   const handlePodcastGenerated = () => statsService.record('podcast', allWords());
 
   const handleSpeakingDone = (word: WordEntry, kind: SpeakingKind, passed: boolean) => {
@@ -428,7 +429,7 @@ const App: React.FC = () => {
       <main className="max-w-5xl mx-auto px-4 py-12">
         {view === ViewState.DICTIONARY && <Dictionary onSave={handleSaveWord} savedWords={savedWords} />}
         {view === ViewState.NOTEBOOK && <Notebook words={savedWords} onDelete={handleDeleteWord} onPractice={(w) => { setPracticeTarget(w); setView(ViewState.PRACTICE); }} onUpdateWord={handleSaveWord} />}
-        {view === ViewState.FLASHCARDS && <Flashcards words={savedWords} onReview={handleReview} onGameComplete={handleGameComplete} newCardsToday={stats.daily.newCards ?? 0} />}
+        {view === ViewState.FLASHCARDS && <Flashcards words={savedWords} onReview={handleReview} onGameComplete={handleGameComplete} onSpellCorrect={handleSpellCorrect} newCardsToday={stats.daily.newCards ?? 0} />}
         {view === ViewState.PRACTICE && <Practice initialWord={practiceTarget} words={savedWords} onScored={handlePracticeScored} />}
         {view === ViewState.SPEAKING && <Speaking words={savedWords} onExerciseDone={handleSpeakingDone} onConversationDone={handleConversationDone} />}
         {view === ViewState.PODCAST && <Podcast words={savedWords} onGenerated={handlePodcastGenerated} />}

@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { WordEntry, SynonymComparison, SentenceAnalysis } from '../types';
 import { lookupWord, playPronunciation, compareSynonyms, analyzeSentence } from '../services/geminiService';
 import { Search, Volume2, Save, Loader2, GitCompare, FileText, Sparkles, Check, Layers, Tag, TrendingUp } from 'lucide-react';
+import { DailyRead } from './DailyRead';
 
 interface DictionaryProps {
   onSave: (word: WordEntry) => void;
@@ -452,6 +453,8 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords }) =>
           {error}
         </div>
       )}
+
+      <DailyRead words={savedWords} />
     </div>
   );
 };
