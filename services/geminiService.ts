@@ -193,9 +193,9 @@ const sentenceAnalysisSchema = {
         required: ["word", "definition"],
       },
     },
-    improvedVersion: { type: Type.STRING },
+    alternatives: { type: Type.ARRAY, items: { type: Type.STRING } },
   },
-  required: ["meaning", "vocabularyBreakdown"],
+  required: ["meaning", "vocabularyBreakdown", "alternatives"],
 };
 
 export const askAboutContext = async (
@@ -474,7 +474,11 @@ export const analyzeSentence = async (sentence: string): Promise<SentenceAnalysi
   try {
     const response = await generateWithRetry(ai, {
       model: getTextModel(),
-      contents: `Break down advanced English sentence: "${sentence}".`,
+      contents: `Help an advanced English learner (C1+) understand this sentence they met while reading: "${sentence}"
+
+1. meaning: restate the full meaning in clear, plain English.
+2. vocabularyBreakdown: ONLY the genuinely difficult items — rare words, idioms, phrasal verbs, or domain jargon that a C1 learner might not know. Skip common words entirely (words like "tell", "offer", "make" do NOT belong here). If nothing is difficult, return an empty array. Usually 1-3 items.
+3. alternatives: 2-3 different natural ways a native speaker could express the same idea — vary the register (e.g. one neutral, one conversational). These are NOT corrections; the original sentence is from published writing.`,
       config: {
         thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
         responseMimeType: "application/json",

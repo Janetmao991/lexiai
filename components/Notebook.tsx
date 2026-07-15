@@ -1,6 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { WordEntry, UserContext } from '../types';
+import { WordEntry, UserContext, SentenceEntry } from '../types';
+import { SentenceList } from './SentenceList';
 import { analyzeContextFromText, playPronunciation, askAboutContext } from '../services/geminiService';
 import { srsService, MASTERY_META } from '../services/srsService';
 import { Trash2, Book, ArrowRight, TrendingUp, ChevronDown, Plus, FileText, Loader2, X, Maximize2, Layers, CloudOff, RefreshCw, Check, Search, Volume2, MessageSquare, Send, Sparkles, BookOpen, Tag } from 'lucide-react';
@@ -12,12 +13,16 @@ interface Message {
 
 interface NotebookProps {
   words: WordEntry[];
+  sentences: SentenceEntry[];
   onDelete: (word: string) => void;
+  onDeleteSentence: (id: string) => void;
+  onLookupWord: (word: string) => void;
   onPractice: (word: WordEntry) => void;
   onUpdateWord: (updatedWord: WordEntry) => void;
 }
 
-export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onPractice, onUpdateWord }) => {
+export const Notebook: React.FC<NotebookProps> = ({ words, sentences, onDelete, onDeleteSentence, onLookupWord, onPractice, onUpdateWord }) => {
+  const [section, setSection] = useState<'words' | 'sentences'>('words');
   const [expandedWords, setExpandedWords] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -183,6 +188,12 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onPractice,
     w.word.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const filteredSentences = sentences.filter(se =>
+    (se.sentence + ' ' + se.meaning + ' ' + se.vocabulary.map(v => v.word).join(' '))
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase())
+  );
+
   const smartSuggestions = [
     "Analyze the Stylistic Nuance.",
     "Perform a Micro-Nuance Comparison.",
@@ -190,7 +201,7 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onPractice,
     "Explain the 'Summary for the Learner'."
   ];
 
-  if (words.length === 0) {
+  if (words.length === 0 && sentences.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-stone-400">
         <Book className="w-12 h-12 mb-4 opacity-20 stroke-[1]" />
@@ -206,7 +217,19 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onPractice,
         {/* Header Section */}
         <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 border-b border-stone-200 pb-6 gap-4">
           <div className="flex-1">
-            <h2 className="text-3xl font-serif font-bold text-stone-800">Vocabulary</h2>
+            <div className="flex items-center gap-2">
+              {([['words', `Words · ${words.length}`], ['sentences', `Sentences · ${sentences.length}`]] as const).map(([id, label]) => (
+                <button
+                  key={id}
+                  onClick={() => setSection(id)}
+                  className={`text-2xl font-serif font-bold transition-colors pb-1 border-b-2 mr-4 ${
+                    section === id ? 'text-stone-900 border-stone-900' : 'text-stone-300 border-transparent hover:text-stone-500'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <div className="relative mt-4">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
               <input 
@@ -228,12 +251,18 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onPractice,
               </p>
              </div>
              <span className="text-xs font-bold text-stone-500 bg-stone-100 px-3 py-1.5 rounded-full uppercase tracking-tighter">
-                {filteredWords.length} results
+                {section === 'words' ? filteredWords.length : filteredSentences.length} results
              </span>
           </div>
         </div>
         
+        {/* Sentences */}
+        {section === 'sentences' && (
+          <SentenceList sentences={filteredSentences} onDelete={onDeleteSentence} onLookup={onLookupWord} />
+        )}
+
         {/* Word List */}
+        {section === 'words' && (
         <div className="divide-y divide-stone-100 min-h-[400px]">
           {filteredWords.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-stone-400 animate-fade-in">
@@ -395,6 +424,7 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onPractice,
             })
           )}
         </div>
+        )}
       </div>
 
       {/* SIDEBAR ASSISTANT */}

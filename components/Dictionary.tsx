@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { WordEntry, SynonymComparison, SentenceAnalysis } from '../types';
+import { WordEntry, SynonymComparison, SentenceAnalysis, SentenceEntry } from '../types';
 import { lookupWord, playPronunciation, compareSynonyms, analyzeSentence } from '../services/geminiService';
 import { Search, Volume2, Save, Loader2, GitCompare, FileText, Sparkles, Check, Layers, Tag, TrendingUp } from 'lucide-react';
 import { DailyRead } from './DailyRead';
@@ -8,11 +8,14 @@ import { DailyRead } from './DailyRead';
 interface DictionaryProps {
   onSave: (word: WordEntry) => void;
   savedWords: WordEntry[];
+  sentences: SentenceEntry[];
+  onSaveSentence: (analysis: SentenceAnalysis, sentence: string) => void;
+  lookupRequest?: { word: string; nonce: number } | null;
 }
 
 type DictionaryMode = 'DEFINE' | 'COMPARE' | 'ANALYZE';
 
-export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords }) => {
+export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, sentences, onSaveSentence, lookupRequest }) => {
   const [activeMode, setActiveMode] = useState<DictionaryMode>('DEFINE');
   const [loading, setLoading] = useState(false);
   const [savingWord, setSavingWord] = useState<string | null>(null);
@@ -37,14 +40,17 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords }) =>
     setError('');
   };
 
-  const handleLookup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query.trim()) return;
+  const doLookup = async (word: string) => {
+    if (!word.trim()) return;
+    setActiveMode('DEFINE');
+    setQuery(word);
     setLoading(true);
     setError('');
     setLookupResult(null);
+    setCompareResult(null);
+    setAnalyzeResult(null);
     try {
-      const data = await lookupWord(query);
+      const data = await lookupWord(word);
       if (data) setLookupResult(data);
       else setError('No results found.');
     } catch (err: any) {
@@ -62,6 +68,19 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords }) =>
       setLoading(false);
     }
   };
+
+  const handleLookup = (e: React.FormEvent) => {
+    e.preventDefault();
+    doLookup(query);
+  };
+
+  React.useEffect(() => {
+    if (lookupRequest?.word) doLookup(lookupRequest.word);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lookupRequest?.nonce]);
+
+  const normalizeSentence = (t: string) => t.trim().toLowerCase().replace(/\s+/g, ' ');
+  const isSentenceSaved = (t: string) => sentences.some(se => normalizeSentence(se.sentence) === normalizeSentence(t));
 
   const handleCompare = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -397,20 +416,42 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords }) =>
             {analyzeResult && (
               <div className="animate-fade-in-up bg-white p-12 rounded-[2.5rem] border border-stone-100 shadow-2xl space-y-12">
                 <div className="border-b border-stone-50 pb-10">
-                  <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-stone-300 mb-4">Semantic Core</h3>
+                  <div className="flex justify-between items-start gap-6 mb-4">
+                    <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-stone-300">Semantic Core</h3>
+                    <button
+                      onClick={() => onSaveSentence(analyzeResult, analyzeInput)}
+                      disabled={isSentenceSaved(analyzeInput)}
+                      className={`shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold transition-all ${
+                        isSentenceSaved(analyzeInput)
+                          ? 'bg-emerald-50 text-emerald-700 cursor-default'
+                          : 'bg-stone-900 text-white hover:bg-black shadow-lg'
+                      }`}
+                    >
+                      {isSentenceSaved(analyzeInput) ? <><Check className="w-4 h-4" /> Saved</> : <><Save className="w-4 h-4" /> Save Sentence</>}
+                    </button>
+                  </div>
                   <p className="text-2xl font-serif text-stone-900 leading-relaxed font-semibold">{analyzeResult.meaning}</p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-16">
                   <div className="space-y-10">
                     <h3 className="text-[11px] font-bold uppercase tracking-[0.3em] text-stone-400 flex items-center gap-3">
-                      <div className="w-6 h-[1px] bg-stone-200" /> Sophisticated Vocabulary
+                      <div className="w-6 h-[1px] bg-stone-200" /> Tricky Bits
                     </h3>
+                    {analyzeResult.vocabularyBreakdown.length === 0 && (
+                      <p className="text-stone-400 font-serif italic">Nothing unusually difficult here — the complexity is in the structure, not the words.</p>
+                    )}
                     <div className="space-y-10">
                       {analyzeResult.vocabularyBreakdown.map((item, idx) => (
                         <div key={idx} className="group relative pl-6 border-l border-stone-100">
                            <div className="flex justify-between items-center mb-2">
-                              <span className="text-xl font-serif font-bold text-stone-900 capitalize tracking-tight group-hover:text-stone-700 transition-colors">{item.word}</span>
+                              <button
+                                onClick={() => doLookup(item.word)}
+                                title="Look up in the dictionary"
+                                className="text-xl font-serif font-bold text-stone-900 capitalize tracking-tight hover:text-stone-600 hover:underline decoration-stone-300 decoration-2 underline-offset-4 transition-colors text-left"
+                              >
+                                {item.word}
+                              </button>
                               <button 
                                 onClick={async () => {
                                   setSavingWord(item.word);
@@ -430,14 +471,18 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords }) =>
                     </div>
                   </div>
 
-                  {analyzeResult.improvedVersion && (
+                  {analyzeResult.alternatives.length > 0 && (
                     <div className="space-y-6">
                       <h3 className="text-[11px] font-bold uppercase tracking-[0.3em] text-stone-400 flex items-center gap-3">
-                        <div className="w-6 h-[1px] bg-stone-200" /> Polished Rendering
+                        <div className="w-6 h-[1px] bg-stone-200" /> Say It Another Way
                       </h3>
-                      <div className="bg-stone-50 p-10 rounded-[2rem] border border-stone-100 shadow-inner italic font-serif text-xl text-stone-700 leading-relaxed relative">
-                        <Sparkles className="absolute top-4 right-4 w-6 h-6 text-stone-200" />
-                        "{analyzeResult.improvedVersion}"
+                      <div className="space-y-4">
+                        {analyzeResult.alternatives.map((alt, i) => (
+                          <div key={i} className="bg-stone-50 p-6 rounded-[1.5rem] border border-stone-100 shadow-inner italic font-serif text-lg text-stone-700 leading-relaxed relative">
+                            <Sparkles className="absolute top-3 right-3 w-4 h-4 text-stone-200" />
+                            "{alt}"
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )}

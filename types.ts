@@ -133,7 +133,18 @@ export interface SynonymComparison {
 export interface SentenceAnalysis {
   meaning: string;
   vocabularyBreakdown: { word: string; definition: string }[];
-  improvedVersion?: string;
+  alternatives: string[]; // other natural ways to express the same idea
+}
+
+export interface SentenceEntry {
+  id: string;
+  sentence: string;
+  meaning: string;
+  vocabulary: { word: string; definition: string }[];
+  alternatives: string[];
+  timestamp: number;
+  lastModified?: string;
+  syncStatus?: 'synced' | 'pending';
 }
 
 export enum ViewState {
