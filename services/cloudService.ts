@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { WordEntry, SentenceEntry } from '../types';
+import { WordEntry } from '../types';
 
 // Cloud word store on Supabase. Same interface shape as the old firebaseService
 // so syncService can swap backends without changing its merge logic.
@@ -59,38 +59,3 @@ export const cloudService = {
   },
 };
 
-// ---- Sentences: separate table, same owner-only RLS ----
-export const sentenceCloud = {
-  getAll: async (userId: string): Promise<Record<string, SentenceEntry>> => {
-    if (!supabase) return {};
-    const { data, error } = await supabase
-      .from('sentences')
-      .select('id, data')
-      .eq('user_id', userId);
-    if (error) {
-      // Table may not exist yet on older self-hosted setups — degrade to local-only.
-      console.warn('[CLOUD] sentences fetch failed:', error.message);
-      return {};
-    }
-    const result: Record<string, SentenceEntry> = {};
-    for (const row of data ?? []) result[row.id] = row.data as SentenceEntry;
-    return result;
-  },
-
-  save: async (userId: string, entry: SentenceEntry): Promise<void> => {
-    if (!supabase) return;
-    const { error } = await supabase.from('sentences').upsert({
-      user_id: userId,
-      id: entry.id,
-      data: { ...entry, syncStatus: 'synced' },
-      updated_at: new Date().toISOString(),
-    });
-    if (error) throw new Error(error.message);
-  },
-
-  remove: async (userId: string, id: string): Promise<void> => {
-    if (!supabase) return;
-    const { error } = await supabase.from('sentences').delete().eq('user_id', userId).eq('id', id);
-    if (error) throw new Error(error.message);
-  },
-};

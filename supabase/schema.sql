@@ -30,19 +30,3 @@ create policy "Users manage their own stats"
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
--- Saved sentences from the Analyze tool (added in V3). Run this block alone
--- if you created the earlier tables before it existed.
-create table if not exists public.sentences (
-  user_id uuid not null references auth.users(id) on delete cascade,
-  id text not null,
-  data jsonb not null,
-  updated_at timestamptz not null default now(),
-  primary key (user_id, id)
-);
-
-alter table public.sentences enable row level security;
-
-create policy "Users manage their own sentences"
-  on public.sentences for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);

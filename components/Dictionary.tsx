@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { WordEntry, SynonymComparison, SentenceAnalysis, SentenceEntry } from '../types';
+import { WordEntry, SynonymComparison, SentenceAnalysis } from '../types';
 import { lookupWord, playPronunciation, compareSynonyms, analyzeSentence } from '../services/geminiService';
 import { Search, Volume2, Save, Loader2, GitCompare, FileText, Sparkles, Check, Layers, Tag, TrendingUp } from 'lucide-react';
 import { DailyRead } from './DailyRead';
@@ -8,14 +8,11 @@ import { DailyRead } from './DailyRead';
 interface DictionaryProps {
   onSave: (word: WordEntry) => void;
   savedWords: WordEntry[];
-  sentences: SentenceEntry[];
-  onSaveSentence: (analysis: SentenceAnalysis, sentence: string) => void;
-  lookupRequest?: { word: string; nonce: number } | null;
 }
 
 type DictionaryMode = 'DEFINE' | 'COMPARE' | 'ANALYZE';
 
-export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, sentences, onSaveSentence, lookupRequest }) => {
+export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords }) => {
   const [activeMode, setActiveMode] = useState<DictionaryMode>('DEFINE');
   const [loading, setLoading] = useState(false);
   const [savingWord, setSavingWord] = useState<string | null>(null);
@@ -73,14 +70,6 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, sent
     e.preventDefault();
     doLookup(query);
   };
-
-  React.useEffect(() => {
-    if (lookupRequest?.word) doLookup(lookupRequest.word);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lookupRequest?.nonce]);
-
-  const normalizeSentence = (t: string) => t.trim().toLowerCase().replace(/\s+/g, ' ');
-  const isSentenceSaved = (t: string) => sentences.some(se => normalizeSentence(se.sentence) === normalizeSentence(t));
 
   const handleCompare = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -416,20 +405,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, sent
             {analyzeResult && (
               <div className="animate-fade-in-up bg-white p-12 rounded-[2.5rem] border border-stone-100 shadow-2xl space-y-12">
                 <div className="border-b border-stone-50 pb-10">
-                  <div className="flex justify-between items-start gap-6 mb-4">
-                    <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-stone-300">Semantic Core</h3>
-                    <button
-                      onClick={() => onSaveSentence(analyzeResult, analyzeInput)}
-                      disabled={isSentenceSaved(analyzeInput)}
-                      className={`shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold transition-all ${
-                        isSentenceSaved(analyzeInput)
-                          ? 'bg-emerald-50 text-emerald-700 cursor-default'
-                          : 'bg-stone-900 text-white hover:bg-black shadow-lg'
-                      }`}
-                    >
-                      {isSentenceSaved(analyzeInput) ? <><Check className="w-4 h-4" /> Saved</> : <><Save className="w-4 h-4" /> Save Sentence</>}
-                    </button>
-                  </div>
+                  <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-stone-300 mb-4">Semantic Core</h3>
                   <p className="text-2xl font-serif text-stone-900 leading-relaxed font-semibold">{analyzeResult.meaning}</p>
                 </div>
 

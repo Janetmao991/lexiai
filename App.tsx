@@ -6,12 +6,11 @@ import { Flashcards } from './components/Flashcards.tsx';
 import { Practice } from './components/Practice.tsx';
 import { Podcast } from './components/Podcast.tsx';
 import { Speaking, SpeakingKind } from './components/Speaking.tsx';
-import { WordEntry, ViewState, SrsRating, UserStats, SentenceEntry, SentenceAnalysis } from './types.ts';
+import { WordEntry, ViewState, SrsRating, UserStats } from './types.ts';
 import { Book, GraduationCap, LayoutGrid, PenTool, X, Cloud, CloudOff, Loader2, Mic2, Database, Terminal, LogOut, Download, Upload, Flame, Settings as SettingsIcon } from 'lucide-react';
 import { localStorageService } from './services/localStorageService.ts';
 import { syncService } from './services/syncService.ts';
-import { cloudService, sentenceCloud } from './services/cloudService.ts';
-import { sentenceService } from './services/sentenceService.ts';
+import { cloudService } from './services/cloudService.ts';
 import { supabase, isCloudConfigured } from './services/supabaseClient.ts';
 import { srsService } from './services/srsService.ts';
 import { statsService, levelForXp } from './services/statsService.ts';
@@ -25,8 +24,6 @@ const App: React.FC = () => {
   const [practiceTarget, setPracticeTarget] = useState<WordEntry | undefined>(undefined);
 
   const [savedWords, setSavedWords] = useState<WordEntry[]>([]);
-  const [sentences, setSentences] = useState<SentenceEntry[]>([]);
-  const [lookupRequest, setLookupRequest] = useState<{ word: string; nonce: number } | null>(null);
 
   const [session, setSession] = useState<Session | null>(null);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'error'>('idle');
@@ -52,7 +49,6 @@ const App: React.FC = () => {
     const localWordsMap = localStorageService.getAllWords();
     const sorted = Object.values(localWordsMap).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     setSavedWords(sorted);
-    setSentences(Object.values(sentenceService.getAll()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)));
   };
 
   useEffect(() => {
@@ -83,24 +79,6 @@ const App: React.FC = () => {
         const merged = await syncService.bidirectionalSync(session.user.id);
         const wordsArray = Object.values(merged).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
         setSavedWords(wordsArray);
-
-        // Sentences: same newest-wins merge, then push anything the cloud lacks.
-        const remoteSentences = await sentenceCloud.getAll(session.user.id);
-        const localSentences = sentenceService.getAll();
-        const mergedSentences: Record<string, SentenceEntry> = { ...localSentences };
-        for (const [id, remote] of Object.entries(remoteSentences)) {
-          const local = localSentences[id];
-          if (!local || ((remote.lastModified || '0') > (local.lastModified || '0') && local.syncStatus !== 'pending')) {
-            mergedSentences[id] = { ...remote, syncStatus: 'synced' };
-          }
-        }
-        sentenceService.importAll(mergedSentences);
-        for (const entry of Object.values(mergedSentences)) {
-          if (!remoteSentences[entry.id] || entry.syncStatus === 'pending') {
-            sentenceCloud.save(session.user.id, entry).then(() => sentenceService.markSynced(entry.id)).catch(() => {});
-          }
-        }
-        setSentences(Object.values(mergedSentences).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)));
         setLastSyncTime(new Date().toLocaleTimeString());
         setSyncStatus('idle');
         setLastError(null);
@@ -178,38 +156,6 @@ const App: React.FC = () => {
       }
     }
     statsService.record('speaking', allWords());
-  };
-
-  const handleSaveSentence = (analysis: SentenceAnalysis, sentence: string) => {
-    const entry: SentenceEntry = {
-      id: `s_${Date.now()}`,
-      sentence: sentence.trim(),
-      meaning: analysis.meaning,
-      vocabulary: analysis.vocabularyBreakdown,
-      alternatives: analysis.alternatives,
-      timestamp: Date.now(),
-      lastModified: new Date().toISOString(),
-      syncStatus: 'pending',
-    };
-    sentenceService.save(entry);
-    setSentences(prev => [entry, ...prev]);
-    statsService.record('save', allWords());
-    if (session) {
-      sentenceCloud.save(session.user.id, entry)
-        .then(() => { sentenceService.markSynced(entry.id); setSentences(prev => prev.map(e => e.id === entry.id ? { ...e, syncStatus: 'synced' } : e)); })
-        .catch(e => console.warn('Sentence cloud sync deferred.', e));
-    }
-  };
-
-  const handleDeleteSentence = (id: string) => {
-    sentenceService.remove(id);
-    setSentences(prev => prev.filter(e => e.id !== id));
-    if (session) sentenceCloud.remove(session.user.id, id).catch(() => {});
-  };
-
-  const handleLookupWord = (word: string) => {
-    setView(ViewState.DICTIONARY);
-    setLookupRequest({ word, nonce: Date.now() });
   };
 
   const handleDeleteWord = async (wordId: string) => {
@@ -481,8 +427,8 @@ const App: React.FC = () => {
       )}
 
       <main className="max-w-5xl mx-auto px-4 py-12">
-        {view === ViewState.DICTIONARY && <Dictionary onSave={handleSaveWord} savedWords={savedWords} sentences={sentences} onSaveSentence={handleSaveSentence} lookupRequest={lookupRequest} />}
-        {view === ViewState.NOTEBOOK && <Notebook words={savedWords} sentences={sentences} onDelete={handleDeleteWord} onDeleteSentence={handleDeleteSentence} onLookupWord={handleLookupWord} onPractice={(w) => { setPracticeTarget(w); setView(ViewState.PRACTICE); }} onUpdateWord={handleSaveWord} />}
+        {view === ViewState.DICTIONARY && <Dictionary onSave={handleSaveWord} savedWords={savedWords} />}
+        {view === ViewState.NOTEBOOK && <Notebook words={savedWords} onDelete={handleDeleteWord} onPractice={(w) => { setPracticeTarget(w); setView(ViewState.PRACTICE); }} onUpdateWord={handleSaveWord} />}
         {view === ViewState.FLASHCARDS && <Flashcards words={savedWords} onReview={handleReview} onGameComplete={handleGameComplete} onSpellCorrect={handleSpellCorrect} newCardsToday={stats.daily.newCards ?? 0} />}
         {view === ViewState.PRACTICE && <Practice initialWord={practiceTarget} words={savedWords} onScored={handlePracticeScored} />}
         {view === ViewState.SPEAKING && <Speaking words={savedWords} onExerciseDone={handleSpeakingDone} onConversationDone={handleConversationDone} />}
