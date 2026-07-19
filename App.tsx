@@ -217,21 +217,30 @@ const App: React.FC = () => {
     try {
       const parsed = JSON.parse(await file.text());
       const words: Record<string, WordEntry> = parsed.words || parsed;
+      // Single-pass bulk merge + one write: thousands of entries import in
+      // milliseconds instead of freezing the tab with per-word rewrites.
       const merged = syncService.mergeData(localStorageService.getAllWords(), words);
-      localStorageService.importData(merged);
-      // Everything imported still needs a push to the cloud.
-      Object.keys(words).forEach(w => {
-        const entry = localStorageService.getWord(w);
-        if (entry) localStorageService.saveWord(w, { ...entry, syncStatus: 'pending' });
-      });
+      for (const key of Object.keys(words)) {
+        if (merged[key]) merged[key] = { ...merged[key], syncStatus: 'pending' };
+      }
+      if (!localStorageService.importData(merged)) {
+        throw new Error('Browser storage rejected the data (likely full).');
+      }
       refreshFromLocal();
+      setAuthMessage(`Imported ${Object.keys(words).length} words.` + (session ? ' Uploading to cloud…' : ''));
       if (session) {
         setSyncStatus('syncing');
-        await syncService.syncToCloud(session.user.id);
+        const pending = Object.fromEntries(Object.entries(merged).filter(([, w]) => w.syncStatus === 'pending'));
+        await cloudService.saveAllWords(session.user.id, pending);
+        const all = localStorageService.getAllWords();
+        for (const key of Object.keys(pending)) {
+          if (all[key]) { all[key].syncStatus = 'synced'; all[key].lastSyncTime = new Date().toISOString(); }
+        }
+        localStorageService.importData(all);
         setSyncStatus('idle');
         refreshFromLocal();
+        setAuthMessage(`Imported ${Object.keys(words).length} words and synced to cloud.`);
       }
-      setAuthMessage(`Imported ${Object.keys(words).length} words.`);
     } catch (err: any) {
       setAuthMessage(`Import failed: ${err.message}`);
     } finally {
