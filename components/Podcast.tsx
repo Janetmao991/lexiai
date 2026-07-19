@@ -11,6 +11,7 @@ interface PodcastProps {
 
 export const Podcast: React.FC<PodcastProps> = ({ words, onGenerated }) => {
   const [selectedWords, setSelectedWords] = useState<string[]>([]);
+  const [wordFilter, setWordFilter] = useState('');
   const [step, setStep] = useState<'SELECT' | 'GENERATING' | 'PLAYING'>('SELECT');
   const [script, setScript] = useState<PodcastScript | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -137,8 +138,18 @@ export const Podcast: React.FC<PodcastProps> = ({ words, onGenerated }) => {
                       </span>
                   </div>
                   
+                  <input
+                    type="text"
+                    value={wordFilter}
+                    onChange={e => setWordFilter(e.target.value)}
+                    placeholder="Filter words..."
+                    className="w-full mb-4 px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-lg text-sm outline-none focus:ring-1 focus:ring-stone-400"
+                  />
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                      {words.map(w => (
+                      {words
+                        .filter(w => selectedWords.includes(w.word) || w.word.toLowerCase().includes(wordFilter.toLowerCase()))
+                        .slice(0, 60)
+                        .map(w => (
                           <button
                             key={w.word}
                             onClick={() => toggleWord(w.word)}

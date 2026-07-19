@@ -20,6 +20,10 @@ interface NotebookProps {
 export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onPractice, onUpdateWord }) => {
   const [expandedWords, setExpandedWords] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
+  const [visibleCount, setVisibleCount] = useState(100);
+
+  // Large notebooks: render incrementally so thousands of words stay snappy.
+  useEffect(() => { setVisibleCount(100); }, [searchQuery]);
   
   // Sidebar Chat States
   const [sidebarContext, setSidebarContext] = useState<{ word: WordEntry; context: UserContext } | null>(null);
@@ -241,7 +245,7 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onPractice,
                <p className="text-sm font-medium">No results found for "{searchQuery}"</p>
             </div>
           ) : (
-            filteredWords.map((entry) => {
+            filteredWords.slice(0, visibleCount).map((entry) => {
               const isExpanded = expandedWords.has(entry.word);
               return (
                 <div key={entry.word} className={`bg-white transition-all duration-300 ${isExpanded ? 'my-4 rounded-xl shadow-lg border border-stone-100' : 'hover:bg-stone-50/50'}`}>
@@ -395,6 +399,17 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onPractice,
             })
           )}
         </div>
+
+        {filteredWords.length > visibleCount && (
+          <div className="text-center py-8">
+            <button
+              onClick={() => setVisibleCount(n => n + 200)}
+              className="px-6 py-3 bg-stone-100 text-stone-700 rounded-full text-sm font-bold hover:bg-stone-200 transition-colors"
+            >
+              Show more ({filteredWords.length - visibleCount} remaining)
+            </button>
+          </div>
+        )}
       </div>
 
       {/* SIDEBAR ASSISTANT */}
