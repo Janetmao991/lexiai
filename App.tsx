@@ -38,6 +38,8 @@ const App: React.FC = () => {
   const [password, setPassword] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
   const [authMessage, setAuthMessage] = useState<string | null>(null);
+  const [codeSent, setCodeSent] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
   const importInputRef = useRef<HTMLInputElement>(null);
 
   // Password recovery (arrived via reset-email link)
@@ -204,9 +206,20 @@ const App: React.FC = () => {
           setShowAccount(false);
         }
       } else if (authMode === 'forgot') {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
-        if (error) throw error;
-        setAuthMessage('Reset link sent — check your inbox (and spam folder), then open the link in this browser.');
+        if (!codeSent) {
+          const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+          if (error) throw error;
+          setCodeSent(true);
+          setAuthMessage('Email sent! Enter the 6-digit code from it below. (Check spam if you don\'t see it.)');
+        } else {
+          const { error } = await supabase.auth.verifyOtp({ email, token: otpCode.trim(), type: 'recovery' });
+          if (error) throw error;
+          setShowAccount(false);
+          setOtpCode('');
+          setCodeSent(false);
+          setAuthMode('signin');
+          setShowReset(true);
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -420,7 +433,7 @@ const App: React.FC = () => {
                 <form onSubmit={handleAuthSubmit} className="space-y-4">
                   <p className="text-stone-500 text-sm">
                     {authMode === 'forgot'
-                      ? "Enter your account email and we'll send you a link to set a new password."
+                      ? (codeSent ? 'Check your email for a 6-digit code and enter it below.' : "Enter your account email and we'll send you a reset code.")
                       : 'Sync your notebook across devices. Words stay on this device until you sign in.'}
                   </p>
                   <input
@@ -442,6 +455,20 @@ const App: React.FC = () => {
                       className="w-full p-4 bg-stone-50 border border-stone-200 rounded-xl outline-none focus:ring-2 focus:ring-stone-900"
                     />
                   )}
+                  {authMode === 'forgot' && codeSent && (
+                    <input
+                      type="text"
+                      required
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      maxLength={6}
+                      value={otpCode}
+                      onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                      placeholder="6-digit code"
+                      autoFocus
+                      className="w-full p-4 bg-stone-50 border border-stone-200 rounded-xl outline-none focus:ring-2 focus:ring-stone-900 text-center text-2xl tracking-[0.5em] font-mono"
+                    />
+                  )}
                   {authMessage && <p className="text-sm text-amber-700">{authMessage}</p>}
                   <button
                     type="submit"
@@ -449,11 +476,20 @@ const App: React.FC = () => {
                     className="w-full py-4 bg-stone-900 text-white rounded-xl font-bold hover:bg-black transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     {authBusy && <Loader2 className="w-4 h-4 animate-spin" />}
-                    {authMode === 'signin' ? 'Sign In' : authMode === 'signup' ? 'Sign Up' : 'Email Me a Reset Link'}
+                    {authMode === 'signin' ? 'Sign In' : authMode === 'signup' ? 'Sign Up' : codeSent ? 'Verify Code' : 'Email Me a Reset Code'}
                   </button>
+                  {authMode === 'forgot' && codeSent && (
+                    <button
+                      type="button"
+                      onClick={() => { setCodeSent(false); setOtpCode(''); setAuthMessage(null); }}
+                      className="w-full text-sm text-stone-500 hover:text-stone-900"
+                    >
+                      Didn't get it? Send again
+                    </button>
+                  )}
                   <button
                     type="button"
-                    onClick={() => { setAuthMode(authMode === 'signin' ? 'signup' : 'signin'); setAuthMessage(null); }}
+                    onClick={() => { setAuthMode(authMode === 'signin' ? 'signup' : 'signin'); setCodeSent(false); setOtpCode(''); setAuthMessage(null); }}
                     className="w-full text-sm text-stone-500 hover:text-stone-900"
                   >
                     {authMode === 'signin' ? "No account yet? Create one" : authMode === 'signup' ? 'Already have an account? Sign in' : '← Back to sign in'}
