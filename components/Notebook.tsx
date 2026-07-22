@@ -63,7 +63,7 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onPractice,
   };
 
   const handleSaveContext = async (wordEntry: WordEntry) => {
-    if (!newContextText.trim() || !newContextTitle.trim()) return;
+    if (!newContextText.trim()) return;
     setIsAnalyzing(true);
     setErrorMsg('');
     try {
@@ -75,7 +75,7 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onPractice,
         }
         const newContext: UserContext = {
             id: Date.now().toString(),
-            sourceTitle: newContextTitle,
+            sourceTitle: newContextTitle.trim() || 'Personal Note',
             fullText: newContextText,
             targetSentence: result.sentence,
             explanation: result.explanation,
@@ -353,7 +353,7 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onPractice,
                             <h4 className="text-sm font-bold uppercase tracking-wider text-stone-400 flex items-center gap-2">
                                 <FileText className="w-4 h-4" /> Usage Contexts
                             </h4>
-                            <button onClick={() => setAddingContextFor(entry.word)} className="text-xs text-stone-500 hover:text-stone-900 font-medium transition-colors flex items-center gap-1">
+                            <button onClick={() => { setAddingContextFor(entry.word); setErrorMsg(''); }} className="text-xs text-stone-500 hover:text-stone-900 font-medium transition-colors flex items-center gap-1">
                                 <Plus className="w-3 h-3" /> Add Article
                             </button>
                           </div>
@@ -361,10 +361,11 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onPractice,
                           {addingContextFor === entry.word && (
                               <div className="bg-stone-50 p-4 rounded-xl border border-stone-200 mb-6 animate-fade-in shadow-inner">
                                   <h5 className="font-serif font-bold text-stone-800 mb-3 text-lg">New Article Context</h5>
-                                  <input type="text" placeholder="Title (e.g., Bloomberg News)" value={newContextTitle} onChange={(e) => setNewContextTitle(e.target.value)} className="w-full mb-3 p-3 text-sm border border-stone-200 rounded-lg outline-none focus:ring-1 focus:ring-stone-300" />
+                                  <input type="text" placeholder="Title — optional (e.g., Bloomberg News)" value={newContextTitle} onChange={(e) => setNewContextTitle(e.target.value)} className="w-full mb-3 p-3 text-sm border border-stone-200 rounded-lg outline-none focus:ring-1 focus:ring-stone-300" />
                                   <textarea placeholder={`Paste text containing "${entry.word}"...`} value={newContextText} onChange={(e) => setNewContextText(e.target.value)} className="w-full h-32 p-3 text-sm border border-stone-200 rounded-lg outline-none focus:ring-1 focus:ring-stone-300 resize-none font-serif text-stone-600" />
+                                  {errorMsg && <p className="text-sm text-amber-700 mt-2">{errorMsg}</p>}
                                   <div className="flex justify-end gap-2 mt-3">
-                                      <button onClick={() => setAddingContextFor(null)} className="px-3 py-1.5 text-xs font-medium text-stone-500">Cancel</button>
+                                      <button onClick={() => { setAddingContextFor(null); setErrorMsg(''); }} className="px-3 py-1.5 text-xs font-medium text-stone-500">Cancel</button>
                                       <button onClick={() => handleSaveContext(entry)} disabled={isAnalyzing || !newContextText} className="px-4 py-1.5 bg-stone-900 text-white text-xs font-bold uppercase tracking-widest rounded-lg hover:bg-black disabled:opacity-50 flex items-center gap-2">
                                           {isAnalyzing ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Analyze & Save'}
                                       </button>
