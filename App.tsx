@@ -73,6 +73,21 @@ const App: React.FC = () => {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  // Recovery links can be processed before the listener above subscribes, and
+  // expired/used links come back as #error_description=… — handle both from the URL.
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (!hash) return;
+    if (/type=recovery/.test(hash)) setShowReset(true);
+    const err = hash.match(/error_description=([^&]+)/);
+    if (err) {
+      setShowAccount(true);
+      setAuthMode('forgot');
+      setAuthMessage(`This reset link no longer works (${decodeURIComponent(err[1].replace(/\+/g, ' '))}). Links are single-use — send yourself a fresh one below and open it right away.`);
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, []);
+
   // Sync whenever we have a logged-in user
   useEffect(() => {
     if (!session) {
