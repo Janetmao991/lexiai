@@ -6,17 +6,25 @@ import { WordEntry } from '../types';
 export const cloudService = {
   getWords: async (userId: string): Promise<Record<string, WordEntry>> => {
     if (!supabase) return {};
-    const { data, error } = await supabase
-      .from('words')
-      .select('word, data')
-      .eq('user_id', userId);
-    if (error) {
-      console.error('[CLOUD] getWords failed:', error.message);
-      throw new Error(error.message);
-    }
+    // Page through: Supabase caps a single select at 1,000 rows, and the
+    // notebook is 3,500+ words — an unpaged read silently drops the rest.
     const result: Record<string, WordEntry> = {};
-    for (const row of data ?? []) {
-      result[row.word] = row.data as WordEntry;
+    const PAGE = 1000;
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabase
+        .from('words')
+        .select('word, data')
+        .eq('user_id', userId)
+        .order('word')
+        .range(from, from + PAGE - 1);
+      if (error) {
+        console.error('[CLOUD] getWords failed:', error.message);
+        throw new Error(error.message);
+      }
+      for (const row of data ?? []) {
+        result[row.word] = row.data as WordEntry;
+      }
+      if (!data || data.length < PAGE) break;
     }
     return result;
   },

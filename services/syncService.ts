@@ -74,8 +74,18 @@ export const syncService = {
       await cloudService.saveAllWords(userId, toPush);
     }
 
-    Object.keys(mergedWords).forEach(word => localStorageService.markAsSynced(word));
+    // Stamp everything synced in ONE write — per-word markAsSynced re-parses
+    // and rewrites the multi-MB store each call, freezing the tab for minutes.
+    const now = new Date().toISOString();
+    const finalWords = localStorageService.getAllWords();
+    for (const entry of Object.values(finalWords)) {
+      if (entry.syncStatus !== 'synced') {
+        entry.syncStatus = 'synced';
+        entry.lastSyncTime = now;
+      }
+    }
+    localStorageService.importData(finalWords);
     console.log('[SYNC] Bi-directional sync completed');
-    return localStorageService.getAllWords();
+    return finalWords;
   },
 };
