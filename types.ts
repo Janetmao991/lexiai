@@ -47,6 +47,8 @@ export interface WordEntry {
   timestamp: number;
   wasCorrected?: boolean;
   originalQuery?: string;
+  /** Reverse-lookup (e.g. Chinese → English): other candidate words, closest first. */
+  candidates?: { word: string; nuance: string }[];
   srs?: SrsState;
   mastery?: MasteryState;
   // Sync metadata

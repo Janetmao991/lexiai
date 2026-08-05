@@ -99,6 +99,17 @@ const dictionarySchema = {
         required: ["partOfSpeech", "definitions"],
       },
     },
+    candidates: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          word: { type: Type.STRING },
+          nuance: { type: Type.STRING },
+        },
+        required: ["word", "nuance"],
+      },
+    },
   },
   required: ["word", "ipa", "meanings"],
 };
@@ -241,6 +252,31 @@ export const askAboutContext = async (
   }
 };
 
+// Global "Ask Lexi" chat — reachable from every page for quick word/usage questions.
+export const askLexi = async (
+  question: string,
+  history: { role: 'user' | 'model'; text: string }[] = []
+): Promise<string> => {
+  const ai = getAi();
+  const chat = ai.chats.create({
+    model: getTextModel(),
+    history: history.map(h => ({ role: h.role, parts: [{ text: h.text }] })),
+    config: {
+      thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
+      systemInstruction: `You are Lexi — a sharp, warm English tutor living inside a dictionary app, chatting with an advanced learner (Chinese native, C1, finance background).
+Rules:
+1. Questions may be in English or Chinese; answer primarily in English (simple, clear), adding a short Chinese gloss for the key term when the question was in Chinese.
+2. Keep answers SHORT: under 120 words. One idea per line, blank line between points.
+3. NO markdown symbols (no *, #, backticks). Plain text only.
+4. When explaining a word: meaning in one line, one natural example, one nuance vs its closest synonym.
+5. If asked for a word from a Chinese meaning, give the best 2-3 English options, closest first, one line each on how they differ.`,
+      temperature: 0.6,
+    },
+  });
+  const response = await chat.sendMessage({ message: question });
+  return response.text || 'Hmm, no answer came back — try rephrasing?';
+};
+
 export const lookupWord = async (word: string): Promise<WordEntry | null> => {
   const ai = getAi();
   try {
@@ -254,7 +290,8 @@ export const lookupWord = async (word: string): Promise<WordEntry | null> => {
       2. If you correct it, set "wasCorrected" to true.
       3. Provide IPA, detailed meanings, and advanced usage examples.
       4. ESSENTIAL: Provide 4-6 natural collocations for each definition.
-      5. FINANCIAL FOCUS: If the word has a specific meaning in Finance, Business, or Economics, ENSURE you include that definition and set the partOfSpeech to exactly "Noun (Finance)", "Verb (Finance)", etc.`,
+      5. FINANCIAL FOCUS: If the word has a specific meaning in Finance, Business, or Economics, ENSURE you include that definition and set the partOfSpeech to exactly "Noun (Finance)", "Verb (Finance)", etc.
+      6. REVERSE LOOKUP: The input may be CHINESE (or an English description of a meaning) instead of an English word. In that case, pick the single closest English word/phrase as the headword and fill "candidates" with 2-3 OTHER English words that also express it, ordered closest-in-meaning first, each with a one-line "nuance" explaining when it fits better than the headword. For a normal English-word lookup, leave "candidates" as [].`,
       config: {
         thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
         responseMimeType: "application/json",

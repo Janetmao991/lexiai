@@ -2,7 +2,8 @@
 import React, { useState, useMemo } from 'react';
 import { WordEntry, SrsRating } from '../types';
 import { srsService, MASTERY_META } from '../services/srsService';
-import { RotateCcw, ChevronLeft, ChevronRight, CheckCircle2, Layers, Gamepad2, CalendarClock, Keyboard } from 'lucide-react';
+import { RotateCcw, ChevronLeft, ChevronRight, CheckCircle2, Layers, Gamepad2, CalendarClock, Keyboard, Volume2 } from 'lucide-react';
+import { playPronunciation } from '../services/geminiService';
 import { SynonymMatch } from './SynonymMatch';
 import { SpellingBee } from './SpellingBee';
 
@@ -212,9 +213,18 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
                   <h2 className={`${fontSizeClass} font-serif font-bold text-stone-900 capitalize tracking-tight`}>
                     {currentCard.word}
                   </h2>
-                  <span className="inline-block text-lg text-stone-400 font-mono">
-                    /{currentCard.ipa}/
-                  </span>
+                  <div className="flex items-center justify-center gap-3">
+                    <span className="inline-block text-lg text-stone-400 font-mono">
+                      /{currentCard.ipa}/
+                    </span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); playPronunciation(currentCard.word); }}
+                      className="p-2.5 bg-stone-100 text-stone-600 rounded-full hover:bg-stone-900 hover:text-white transition-all hover:scale-110"
+                      title="Hear it"
+                    >
+                      <Volume2 className="w-4 h-4" />
+                    </button>
+                  </div>
                </div>
              )}
              <p className="absolute bottom-6 text-xs text-stone-300 uppercase tracking-widest font-semibold">
@@ -224,14 +234,32 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
 
           {/* Back Side (definition — or the word when the card runs in reverse) */}
           <div className="absolute w-full h-full bg-stone-900 rounded-xl shadow-xl border border-stone-800 p-8 flex flex-col items-center justify-center backface-hidden rotate-y-180 text-stone-200">
+            {!reversed && (
+              <button
+                onClick={(e) => { e.stopPropagation(); playPronunciation(currentCard.word); }}
+                className="absolute top-4 right-4 z-10 p-2.5 bg-stone-800 text-stone-300 rounded-full hover:bg-white hover:text-stone-900 transition-all hover:scale-110"
+                title="Hear it"
+              >
+                <Volume2 className="w-4 h-4" />
+              </button>
+            )}
             {reversed ? (
               <div className="text-center space-y-4 w-full px-4">
                 <h2 className={`${fontSizeClass} font-serif font-bold text-white capitalize tracking-tight`}>
                   {currentCard.word}
                 </h2>
-                <span className="inline-block text-lg text-stone-400 font-mono">
-                  /{currentCard.ipa}/
-                </span>
+                <div className="flex items-center justify-center gap-3">
+                  <span className="inline-block text-lg text-stone-400 font-mono">
+                    /{currentCard.ipa}/
+                  </span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); playPronunciation(currentCard.word); }}
+                    className="p-2.5 bg-stone-800 text-stone-300 rounded-full hover:bg-white hover:text-stone-900 transition-all hover:scale-110"
+                    title="Hear it"
+                  >
+                    <Volume2 className="w-4 h-4" />
+                  </button>
+                </div>
                 {currentCard.contexts && currentCard.contexts.length > 0 && (
                   <p className="text-sm font-serif italic text-stone-400 leading-relaxed pt-4 border-t border-stone-800">
                     “{currentCard.contexts[0].targetSentence}”

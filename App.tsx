@@ -16,6 +16,7 @@ import { srsService } from './services/srsService.ts';
 import { statsService, levelForXp } from './services/statsService.ts';
 import { ProgressPanel } from './components/ProgressPanel.tsx';
 import { Settings } from './components/Settings.tsx';
+import { AskAI } from './components/AskAI.tsx';
 import { hasApiKey } from './services/geminiService.ts';
 import type { Session } from '@supabase/supabase-js';
 
@@ -545,6 +546,7 @@ const App: React.FC = () => {
 
       {showProgress && <ProgressPanel stats={stats} words={savedWords} onClose={() => setShowProgress(false)} />}
       {showSettings && <Settings onClose={() => { setShowSettings(false); setKeyConfigured(hasApiKey()); }} />}
+      <AskAI />
 
       {!keyConfigured && (
         <div className="bg-amber-50 border-b border-amber-100">

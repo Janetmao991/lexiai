@@ -221,6 +221,24 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords }) =>
                     {isSaved(lookupResult.word) ? 'Saved' : 'Save to Notebook'}
                   </button>
                 </div>
+
+                {/* Reverse-lookup candidates (Chinese/description queries) — closest first, click to look up */}
+                {lookupResult.candidates && lookupResult.candidates.length > 0 && (
+                  <div className="mb-12 p-6 bg-stone-50 rounded-2xl border border-stone-100 space-y-3">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-stone-400">Other ways to say it</p>
+                    {lookupResult.candidates.map((c, ci) => (
+                      <button
+                        key={ci}
+                        onClick={() => doLookup(c.word)}
+                        className="w-full text-left p-3 rounded-xl hover:bg-white hover:shadow-sm border border-transparent hover:border-stone-200 transition-all group"
+                      >
+                        <span className="font-serif font-bold text-lg text-stone-900 group-hover:underline underline-offset-4">{c.word}</span>
+                        <span className="text-sm text-stone-500 ml-3">{c.nuance}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 <div className="space-y-12">
                   {lookupResult.meanings.map((m, i) => {
                     const isFinancial = isFinance(m.partOfSpeech);
