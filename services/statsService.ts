@@ -137,6 +137,17 @@ const touchStreak = (stats: UserStats) => {
 export const statsService = {
   get: (): UserStats => load(),
 
+  /**
+   * Showing up counts: opening the app marks today active so the day-streak
+   * grows from daily presence, not only from scored actions.
+   */
+  touch: () => {
+    const stats = load();
+    if (stats.lastActiveDate === todayStr()) return;
+    touchStreak(stats);
+    persist(stats);
+  },
+
   /** Count a brand-new card entering the SRS rotation today. */
   recordNewCard: () => {
     const stats = load();

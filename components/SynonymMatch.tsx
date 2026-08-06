@@ -2,13 +2,15 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { WordEntry } from '../types';
 import { Trophy, TimerReset, Flame, Zap, RotateCcw } from 'lucide-react';
+import { statsService } from '../services/statsService';
 
-// Win-streak + records, persisted across sessions.
+// Game records (fastest win), persisted across sessions. The 🔥 streak shown
+// here is the app-wide DAY streak — kept alive by showing up daily.
 const STATS_KEY = 'lexiai_match_v1';
-interface MatchStats { streak: number; bestStreak: number; bestTime: number | null }
+interface MatchStats { bestTime: number | null }
 const loadStats = (): MatchStats => {
-  try { return { streak: 0, bestStreak: 0, bestTime: null, ...JSON.parse(localStorage.getItem(STATS_KEY) || '{}') }; }
-  catch { return { streak: 0, bestStreak: 0, bestTime: null }; }
+  try { return { bestTime: null, ...JSON.parse(localStorage.getItem(STATS_KEY) || '{}') }; }
+  catch { return { bestTime: null }; }
 };
 const saveStats = (s: MatchStats) => { try { localStorage.setItem(STATS_KEY, JSON.stringify(s)); } catch { /* full */ } };
 
@@ -60,8 +62,9 @@ export const SynonymMatch: React.FC<SynonymMatchProps> = ({ words, onComplete })
   const [status, setStatus] = useState<'playing' | 'won' | 'lost'>('playing');
   const [stats, setStats] = useState<MatchStats>(loadStats);
   const [roundTime, setRoundTime] = useState(0); // frozen at the winning click
+  const dayStreak = statsService.get().streakCurrent;
+  const dayStreakBest = statsService.get().streakBest;
   const completedRef = useRef(false);
-  const lostRef = useRef(false);
 
   const pairTotal = useMemo(() => tiles.length / 2, [tiles]);
 
@@ -89,8 +92,6 @@ export const SynonymMatch: React.FC<SynonymMatchProps> = ({ words, onComplete })
       setRoundTime(used);
       setStats(prev => {
         const next: MatchStats = {
-          streak: prev.streak + 1,
-          bestStreak: Math.max(prev.bestStreak, prev.streak + 1),
           bestTime: prev.bestTime === null ? used : Math.min(prev.bestTime, used),
         };
         saveStats(next);
@@ -99,21 +100,8 @@ export const SynonymMatch: React.FC<SynonymMatchProps> = ({ words, onComplete })
     }
   }, [matched, pairTotal, status, onComplete, secondsLeft]);
 
-  // Time's up breaks the streak.
-  useEffect(() => {
-    if (status === 'lost' && !lostRef.current) {
-      lostRef.current = true;
-      setStats(prev => {
-        const next = { ...prev, streak: 0 };
-        saveStats(next);
-        return next;
-      });
-    }
-  }, [status]);
-
   const restart = () => {
     completedRef.current = false;
-    lostRef.current = false;
     setTiles(buildRound(words));
     setSelected(null);
     setMatched(new Set());
@@ -157,9 +145,9 @@ export const SynonymMatch: React.FC<SynonymMatchProps> = ({ words, onComplete })
       <div className="flex justify-between items-center px-2">
         <div className="flex items-center gap-3">
           <span className="font-mono text-sm text-stone-500">{matched.size} / {pairTotal} pairs</span>
-          {stats.streak > 0 && (
+          {dayStreak > 0 && (
             <span className="flex items-center gap-1 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-100 px-2.5 py-1 rounded-full">
-              <Flame className="w-3.5 h-3.5" /> {stats.streak} win streak
+              <Flame className="w-3.5 h-3.5" /> {dayStreak}-day streak
             </span>
           )}
         </div>
@@ -193,11 +181,11 @@ export const SynonymMatch: React.FC<SynonymMatchProps> = ({ words, onComplete })
               <p className="text-2xl font-serif font-bold text-stone-900">{matched.size}<span className="text-base text-stone-400">/{pairTotal}</span></p>
               <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400 mt-1">Pairs</p>
             </div>
-            <div className={`rounded-2xl py-4 px-2 border ${stats.streak > 0 ? 'bg-amber-50 border-amber-100' : 'bg-stone-50 border-stone-100'}`}>
-              <p className={`text-2xl font-serif font-bold flex items-center justify-center gap-1 ${stats.streak > 0 ? 'text-amber-700' : 'text-stone-900'}`}>
-                <Flame className={`w-5 h-5 ${stats.streak > 0 ? 'text-amber-500' : 'text-stone-300'}`} />{stats.streak}
+            <div className={`rounded-2xl py-4 px-2 border ${dayStreak > 0 ? 'bg-amber-50 border-amber-100' : 'bg-stone-50 border-stone-100'}`}>
+              <p className={`text-2xl font-serif font-bold flex items-center justify-center gap-1 ${dayStreak > 0 ? 'text-amber-700' : 'text-stone-900'}`}>
+                <Flame className={`w-5 h-5 ${dayStreak > 0 ? 'text-amber-500' : 'text-stone-300'}`} />{dayStreak}
               </p>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400 mt-1">Win Streak · Best {stats.bestStreak}</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400 mt-1">Day Streak · Best {dayStreakBest}</p>
             </div>
             <div className="bg-stone-50 border border-stone-100 rounded-2xl py-4 px-2">
               <p className="text-2xl font-serif font-bold text-stone-900 flex items-center justify-center gap-1">
@@ -213,8 +201,8 @@ export const SynonymMatch: React.FC<SynonymMatchProps> = ({ words, onComplete })
           >
             <RotateCcw className="w-4 h-4" /> Play Again
           </button>
-          {status === 'lost' && stats.bestStreak > 0 && (
-            <p className="text-xs text-stone-400 mt-4">Streak reset — your record of {stats.bestStreak} is waiting to be beaten.</p>
+          {status === 'lost' && (
+            <p className="text-xs text-stone-400 mt-4">Playing today already kept your 🔥 day streak alive — win the next one.</p>
           )}
         </div>
       )}

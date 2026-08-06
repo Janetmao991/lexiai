@@ -62,7 +62,10 @@ const App: React.FC = () => {
 
   useEffect(() => {
     refreshFromLocal();
-    return statsService.subscribe(setStats);
+    const unsubscribe = statsService.subscribe(setStats);
+    statsService.touch(); // opening the app keeps the day-streak alive
+    setStats(statsService.get());
+    return unsubscribe;
   }, []);
 
   // Track auth session
