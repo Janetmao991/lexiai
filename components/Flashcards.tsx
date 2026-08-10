@@ -93,7 +93,7 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
   const currentCard = mode === 'due' ? dueQueue[0] : words[browseIndex % words.length];
 
   const renderModeSwitch = () => (
-    <div className="flex items-center gap-1 bg-stone-100 rounded-full p-1">
+    <div className="flex items-center gap-1 bg-stone-100 rounded-full p-1 max-w-full overflow-x-auto">
       {([
         { id: 'due', label: 'Due Today', icon: <CalendarClock className="w-3.5 h-3.5" /> },
         { id: 'all', label: 'Browse All', icon: <Layers className="w-3.5 h-3.5" /> },
@@ -103,7 +103,7 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
         <button
           key={m.id}
           onClick={() => { setMode(m.id); setIsFlipped(false); }}
-          className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all ${
+          className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap shrink-0 ${
             mode === m.id ? 'bg-stone-900 text-white shadow' : 'text-stone-500 hover:text-stone-900'
           }`}
         >
@@ -116,7 +116,7 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
   if (mode === 'game') {
     return (
       <div className="max-w-xl mx-auto flex flex-col items-center space-y-8 py-8">
-        <div className="w-full flex justify-between items-center px-2">
+        <div className="w-full flex flex-wrap justify-between items-center gap-3 px-2">
           <h2 className="text-2xl font-serif font-bold text-stone-800">Synonym Match</h2>
           {renderModeSwitch()}
         </div>
@@ -128,7 +128,7 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
   if (mode === 'spell') {
     return (
       <div className="max-w-xl mx-auto flex flex-col items-center space-y-8 py-8">
-        <div className="w-full flex justify-between items-center px-2">
+        <div className="w-full flex flex-wrap justify-between items-center gap-3 px-2">
           <h2 className="text-2xl font-serif font-bold text-stone-800">Spelling</h2>
           {renderModeSwitch()}
         </div>
@@ -140,7 +140,7 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
   if (mode === 'due' && dueQueue.length === 0) {
     return (
       <div className="max-w-xl mx-auto flex flex-col items-center space-y-8 py-8">
-        <div className="w-full flex justify-between items-center px-2">
+        <div className="w-full flex flex-wrap justify-between items-center gap-3 px-2">
           <h2 className="text-2xl font-serif font-bold text-stone-800">Review</h2>
           {renderModeSwitch()}
         </div>
@@ -174,7 +174,7 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
     <div className="max-w-xl mx-auto flex flex-col items-center space-y-8 py-8">
 
       {/* Header row */}
-      <div className="w-full flex justify-between items-center px-2">
+      <div className="w-full flex flex-wrap justify-between items-center gap-3 px-2">
          <h2 className="text-2xl font-serif font-bold text-stone-800">Review</h2>
          {renderModeSwitch()}
       </div>
@@ -191,19 +191,19 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
 
       {/* Card Container */}
       <div
-        className="relative w-full aspect-[4/3] cursor-pointer group perspective-1000"
+        className="relative w-full aspect-[3/4] sm:aspect-[4/3] cursor-pointer group perspective-1000"
         onClick={() => setIsFlipped(!isFlipped)}
       >
         <div className={`relative w-full h-full duration-700 transform-style-3d transition-all ${isFlipped ? 'rotate-y-180' : ''}`}>
 
           {/* Front Side (word — or definition when the card runs in reverse) */}
-          <div className="absolute w-full h-full bg-white rounded-xl shadow-lg border border-stone-100 p-8 flex flex-col items-center justify-center backface-hidden">
+          <div className="absolute w-full h-full bg-white rounded-xl shadow-lg border border-stone-100 p-8 pb-14 flex flex-col items-center justify-center backface-hidden">
              {reversed ? (
                <div className="text-center space-y-4 w-full px-4">
                   <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-full border bg-amber-50 text-amber-700 border-amber-100 inline-block">
                     Reverse · What's the word?
                   </span>
-                  <p className="text-xl md:text-2xl font-serif italic text-stone-800 leading-relaxed">“{firstDef}”</p>
+                  <p className="text-lg sm:text-xl md:text-2xl font-serif italic text-stone-800 leading-relaxed">“{firstDef}”</p>
                   <p className="text-sm text-stone-400">
                     {firstPos} · starts with <span className="font-bold text-stone-600 uppercase">{currentCard.word[0]}</span>
                   </p>
