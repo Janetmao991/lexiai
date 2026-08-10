@@ -127,7 +127,11 @@ const App: React.FC = () => {
       syncStatus: 'pending'
     };
 
-    localStorageService.saveWord(w.word, entry);
+    const stored = localStorageService.saveWord(w.word, entry);
+    if (!stored) {
+      alert('Your browser storage is full — this word could not be saved locally. Export your notebook (Settings → Export JSON) or sign in to keep everything in the cloud.');
+      return;
+    }
     setSavedWords(prev => {
       const filtered = prev.filter(item => item.word !== w.word);
       return [entry, ...filtered].sort((a, b) => b.timestamp - a.timestamp);

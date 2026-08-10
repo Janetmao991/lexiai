@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type, Modality, ThinkingLevel, GenerateContentParameters, GenerateContentResponse } from "@google/genai";
-import { WordEntry, PracticeFeedback, ContextExplanation, VocabularySuggestion, PodcastScript, SynonymComparison, SentenceAnalysis } from "../types";
+import { WordEntry, PracticeFeedback, ContextExplanation, PodcastScript, SynonymComparison, SentenceAnalysis } from "../types";
 
 // ---- BYOK: the Gemini key lives in this browser only ----
 export const getApiKey = (): string =>
@@ -136,19 +136,6 @@ const contextSchema = {
     usageNuance: { type: Type.STRING },
   },
   required: ["word", "sentence", "explanation", "usageNuance"],
-};
-
-const vocabularySuggestionsSchema = {
-  type: Type.ARRAY,
-  items: {
-    type: Type.OBJECT,
-    properties: {
-      word: { type: Type.STRING },
-      definition: { type: Type.STRING },
-      reason: { type: Type.STRING },
-    },
-    required: ["word", "definition", "reason"],
-  },
 };
 
 const podcastScriptSchema = {
@@ -339,26 +326,6 @@ export const checkSentence = async (word: string, sentence: string): Promise<Pra
   }
 };
 
-export const explainContext = async (word: string, sentence: string): Promise<ContextExplanation | null> => {
-  const ai = getAi();
-  try {
-    const response = await generateWithRetry(ai, {
-      model: getTextModel(),
-      contents: `Explain "${word}" specifically in the context of this sentence: "${sentence}"`,
-      config: {
-        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
-        responseMimeType: "application/json",
-        responseSchema: contextSchema,
-        temperature: 0.3,
-      },
-    });
-    return response.text ? JSON.parse(response.text) : null;
-  } catch (error) {
-    console.error("Error explaining context:", error);
-    throw error;
-  }
-};
-
 export const analyzeContextFromText = async (word: string, fullText: string): Promise<ContextExplanation | null> => {
   const ai = getAi();
   try {
@@ -380,8 +347,8 @@ export const analyzeContextFromText = async (word: string, fullText: string): Pr
 };
 
 export const playPronunciation = async (word: string): Promise<void> => {
-  const ai = getAi();
   try {
+    const ai = getAi();
     const response = await generateWithRetry(ai, {
       model: "gemini-2.5-flash-preview-tts",
       contents: [{ parts: [{ text: word }] }],
@@ -408,28 +375,14 @@ export const playPronunciation = async (word: string): Promise<void> => {
     source.connect(audioContext.destination);
     source.start();
   } catch (error) {
+    // Gemini TTS unavailable (no API key, quota, offline) — fall back to the
+    // browser voice so the speaker button always does something.
     console.error("Error playing pronunciation:", error);
-    throw error;
-  }
-};
-
-export const analyzeVocabulary = async (text: string): Promise<VocabularySuggestion[]> => {
-  const ai = getAi();
-  try {
-    const response = await generateWithRetry(ai, {
-      model: getTextModel(),
-      contents: `Identify 5-10 advanced terms in: "${text.substring(0, 5000)}"`,
-      config: {
-        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
-        responseMimeType: "application/json",
-        responseSchema: vocabularySuggestionsSchema,
-        temperature: 0.3
-      }
-    });
-    return response.text ? JSON.parse(response.text) : [];
-  } catch (error) {
-    console.error("Error analyzing vocabulary:", error);
-    return [];
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(word);
+      utterance.lang = 'en-US';
+      window.speechSynthesis.speak(utterance);
+    }
   }
 };
 
@@ -543,176 +496,6 @@ export const transcribeAudio = async (base64Audio: string, mimeType: string): Pr
     config: { thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL }, temperature: 0 },
   });
   return (response.text || '').trim();
-};
-
-// ---------- Conversation practice ----------
-
-export interface ConversationPlan {
-  topic: string;
-  words: string[];
-  opener: string;
-}
-
-export interface ConversationWordFeedback {
-  word: string;
-  used: boolean;
-  usedWell: boolean;
-  comment: string;
-}
-
-export interface ConversationFeedback {
-  overall: string;
-  score: number;
-  wordFeedback: ConversationWordFeedback[];
-}
-
-const conversationPlanSchema = {
-  type: Type.OBJECT,
-  properties: {
-    topic: { type: Type.STRING },
-    words: { type: Type.ARRAY, items: { type: Type.STRING } },
-    opener: { type: Type.STRING },
-  },
-  required: ["topic", "words", "opener"],
-};
-
-const conversationFeedbackSchema = {
-  type: Type.OBJECT,
-  properties: {
-    overall: { type: Type.STRING },
-    score: { type: Type.NUMBER },
-    wordFeedback: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          word: { type: Type.STRING },
-          used: { type: Type.BOOLEAN },
-          usedWell: { type: Type.BOOLEAN },
-          comment: { type: Type.STRING },
-        },
-        required: ["word", "used", "usedWell", "comment"],
-      },
-    },
-  },
-  required: ["overall", "score", "wordFeedback"],
-};
-
-/** Pick 3-5 words from the candidates that shine in spoken English, plus a topic to anchor them. */
-export const planConversation = async (candidates: string[]): Promise<ConversationPlan> => {
-  const ai = getAi();
-  const response = await generateWithRetry(ai, {
-    model: getTextModel(),
-    contents: `From this vocabulary list, pick 3-5 words/phrases that are genuinely useful in everyday SPOKEN English conversation (prefer phrasal verbs, idioms and conversational words; avoid stiff academic or written-only terms):
-
-${candidates.join(', ')}
-
-Then invent one casual, concrete conversation topic where these words would come up naturally (e.g. career decisions, city life, a recent news story — not "vocabulary practice").
-Also write a warm 1-2 sentence conversation opener about that topic, ending with a question to the learner. Do NOT use any of the target words in the opener — leave them for the learner to discover.`,
-    config: {
-      thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
-      responseMimeType: "application/json",
-      responseSchema: conversationPlanSchema,
-      temperature: 0.9,
-    },
-  });
-  return JSON.parse(response.text!);
-};
-
-/** Create a chat session for conversation practice. Caller keeps the returned chat and calls sendMessage. */
-export const createConversationChat = (plan: ConversationPlan) => {
-  const ai = getAi();
-  return ai.chats.create({
-    model: getTextModel(),
-    config: {
-      thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
-      systemInstruction: `You are Alex, a friendly, curious conversation partner helping an advanced English learner practice SPEAKING vocabulary.
-
-TOPIC: ${plan.topic}
-TARGET WORDS the learner should get chances to use: ${plan.words.join(', ')}
-
-RULES:
-1. Keep each reply SHORT — 1-3 sentences, like real spoken conversation. Always end with a question or a hook that invites a reply.
-2. Steer the conversation so the target words become natural to use. You may use a target word yourself occasionally to model it, but mostly create openings for the learner.
-3. If the learner uses a target word incorrectly, gently recast it in your reply (say it the right way in passing) — do not lecture mid-conversation.
-4. Casual, warm, real. Contractions welcome. No bullet points, no markdown, no teacher-speak.`,
-      temperature: 0.9,
-    },
-  });
-};
-
-/** Grade the finished conversation: which target words were used, and how well. */
-export const gradeConversation = async (
-  transcript: { role: string; text: string }[],
-  targetWords: string[],
-): Promise<ConversationFeedback> => {
-  const ai = getAi();
-  const rendered = transcript.map(t => `${t.role === 'user' ? 'LEARNER' : 'ALEX'}: ${t.text}`).join('\n');
-  const response = await generateWithRetry(ai, {
-    model: getTextModel(),
-    contents: `Here is a conversation between an English learner (LEARNER) and a partner (ALEX).
-Target words the learner was trying to practice: ${targetWords.join(', ')}
-
-${rendered}
-
-For each target word, judge ONLY the LEARNER's usage: did they use it (or a close inflection), and was the usage natural and correct? Give a one-sentence comment each (praise what worked, or show a better phrasing).
-Then give an overall 2-3 sentence assessment of the learner's conversational English (fluency, naturalness, one concrete thing to improve) and a score out of 100.`,
-    config: {
-      thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
-      responseMimeType: "application/json",
-      responseSchema: conversationFeedbackSchema,
-      temperature: 0.3,
-    },
-  });
-  return JSON.parse(response.text!);
-};
-
-// ---------- Natural TTS for conversation (Gemini voice, warm + human) ----------
-
-let activeSpeech: { ctx: AudioContext; source: AudioBufferSourceNode } | null = null;
-
-export const stopNaturalSpeech = () => {
-  if (activeSpeech) {
-    try { activeSpeech.source.stop(); activeSpeech.ctx.close(); } catch { /* already stopped */ }
-    activeSpeech = null;
-  }
-};
-
-/**
- * Speak text with Gemini's neural TTS (far more natural than the browser voice).
- * Resolves when playback finishes. Throws on quota/network errors so the
- * caller can fall back to browser speechSynthesis.
- */
-export const speakNatural = async (text: string): Promise<void> => {
-  const ai = getAi();
-  const response = await generateWithRetry(ai, {
-    model: "gemini-2.5-flash-preview-tts",
-    contents: [{ parts: [{ text: `Say this warmly and conversationally, like chatting with a friend: ${text}` }] }],
-    config: {
-      responseModalities: [Modality.AUDIO],
-      speechConfig: {
-        voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Puck' } },
-      },
-    },
-  });
-  const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-  if (!base64Audio) throw new Error('No audio returned');
-
-  stopNaturalSpeech();
-  const AudioContextClass = (window as any).AudioContext || (window as any).webkitAudioContext;
-  const ctx = new AudioContextClass({ sampleRate: 24000 });
-  const buffer = await decodeAudioData(decode(base64Audio), ctx, 24000, 1);
-  return new Promise<void>(resolve => {
-    const source = ctx.createBufferSource();
-    source.buffer = buffer;
-    source.connect(ctx.destination);
-    activeSpeech = { ctx, source };
-    source.onended = () => {
-      if (activeSpeech?.source === source) { try { ctx.close(); } catch { /* noop */ } activeSpeech = null; }
-      resolve();
-    };
-    source.start();
-  });
 };
 
 // ---------- Daily Read: comprehensible input woven from review words ----------

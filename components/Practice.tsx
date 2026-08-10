@@ -11,6 +11,16 @@ interface PracticeProps {
 }
 
 export const Practice: React.FC<PracticeProps> = ({ initialWord, words, onScored }) => {
+  const [chosenWord, setChosenWord] = useState<WordEntry | undefined>(initialWord || words[0]);
+  const [sentence, setSentence] = useState('');
+  const [feedback, setFeedback] = useState<PracticeFeedback | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Hooks must run on every render; the empty-notebook return lives below them.
+  // words can arrive after mount (cloud sync), so fall back to the first word.
+  const selectedWord = chosenWord && words.some(w => w.word === chosenWord.word) ? chosenWord : words[0];
+
   if (words.length === 0) {
     return (
         <div className="text-center py-20 text-stone-400">
@@ -19,21 +29,18 @@ export const Practice: React.FC<PracticeProps> = ({ initialWord, words, onScored
     )
   }
 
-  const [selectedWord, setSelectedWord] = useState<WordEntry>(initialWord || words[0]);
-  const [sentence, setSentence] = useState('');
-  const [feedback, setFeedback] = useState<PracticeFeedback | null>(null);
-  const [loading, setLoading] = useState(false);
-
   const handleSubmit = async () => {
     if (!sentence.trim()) return;
     setLoading(true);
     setFeedback(null);
+    setError(null);
     try {
       const result = await checkSentence(selectedWord.word, sentence);
       setFeedback(result);
       if (result) onScored?.(selectedWord, result.score);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      setError(e?.message || 'Could not check your sentence. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -42,9 +49,10 @@ export const Practice: React.FC<PracticeProps> = ({ initialWord, words, onScored
   const handleWordChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const word = words.find(w => w.word === e.target.value);
     if (word) {
-      setSelectedWord(word);
+      setChosenWord(word);
       setSentence('');
       setFeedback(null);
+      setError(null);
     }
   };
 
@@ -101,6 +109,12 @@ export const Practice: React.FC<PracticeProps> = ({ initialWord, words, onScored
           </div>
         </div>
       </div>
+
+      {error && (
+        <div className="bg-amber-50 border border-amber-100 text-amber-800 rounded-xl p-4 text-sm flex items-center gap-2 animate-fade-in">
+          <AlertCircle className="w-4 h-4 shrink-0" /> {error}
+        </div>
+      )}
 
       {feedback && (
         <div className={`rounded-xl overflow-hidden animate-fade-in-up border ${

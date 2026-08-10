@@ -79,6 +79,7 @@ export const Podcast: React.FC<PodcastProps> = ({ words, onGenerated }) => {
   };
 
   const handleReset = () => {
+    if (audioUrl) URL.revokeObjectURL(audioUrl);
     setStep('SELECT');
     setScript(null);
     setAudioUrl(null);

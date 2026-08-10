@@ -134,8 +134,12 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onPractice,
             ...prev,
             [ctx.id]: [...(prev[ctx.id] || []), { role: 'model', text: response }]
         }));
-    } catch (err) {
+    } catch (err: any) {
         console.error(err);
+        setChatMessages(prev => ({
+            ...prev,
+            [ctx.id]: [...(prev[ctx.id] || []), { role: 'model', text: `Sorry — I couldn't answer that. ${err?.message || 'Please try again.'}` }]
+        }));
     } finally {
         setIsChatLoading(false);
     }

@@ -449,9 +449,14 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords }) =>
                               <button 
                                 onClick={async () => {
                                   setSavingWord(item.word);
-                                  const entry = await lookupWord(item.word);
-                                  if(entry) onSave(entry);
-                                  setSavingWord(null);
+                                  try {
+                                    const entry = await lookupWord(item.word);
+                                    if(entry) onSave(entry);
+                                  } catch (e) {
+                                    console.error('Failed to save word:', e);
+                                  } finally {
+                                    setSavingWord(null);
+                                  }
                                 }}
                                 disabled={isSaved(item.word) || savingWord === item.word}
                                 className={`p-2 rounded-full transition-all ${isSaved(item.word) ? 'text-emerald-500 bg-emerald-50' : 'text-stone-300 hover:text-stone-900 hover:bg-stone-50'}`}

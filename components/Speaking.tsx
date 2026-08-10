@@ -57,13 +57,20 @@ export const Speaking: React.FC<SpeakingProps> = ({ words, onExerciseDone }) => 
     );
   }
 
+  // Bumped on mode switch so a recording started before the switch (e.g. while
+  // the mic-permission prompt was open) is cancelled instead of orphaned.
+  const recGen = useRef(0);
+
   const startRecording = async (onTranscript: (t: string) => void) => {
     setError(null);
+    const gen = recGen.current;
     try {
       setRecState('recording');
-      recordingRef.current = await speechService.startRecording();
+      const handle = await speechService.startRecording();
+      if (gen !== recGen.current) { handle.cancel(); return; }
+      recordingRef.current = handle;
       // store the consumer for stop
-      (recordingRef.current as any)._consume = onTranscript;
+      (handle as any)._consume = onTranscript;
     } catch (e: any) {
       setRecState('idle');
       setError(e.message || 'Could not access the microphone.');
@@ -119,6 +126,7 @@ export const Speaking: React.FC<SpeakingProps> = ({ words, onExerciseDone }) => 
   ];
 
   const switchMode = (m: SpeakingKind) => {
+    recGen.current++;
     recordingRef.current?.cancel();
     speechService.stopSpeaking();
     setMode(m);
