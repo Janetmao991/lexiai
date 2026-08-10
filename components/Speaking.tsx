@@ -4,15 +4,13 @@ import { WordEntry } from '../types';
 import { speechService, diffTranscript, containsWord, ShadowDiff, RecordingHandle } from '../services/speechService';
 import { checkSentence } from '../services/geminiService';
 import { PracticeFeedback } from '../types';
-import { Conversation } from './Conversation';
-import { Mic, Square, Volume2, ArrowRight, Loader2, CheckCircle2, XCircle, Ear, MessageCircle, Lightbulb, Award, AlertCircle, MessagesSquare } from 'lucide-react';
+import { Mic, Square, Volume2, ArrowRight, Loader2, CheckCircle2, XCircle, Ear, MessageCircle, Lightbulb, Award, AlertCircle } from 'lucide-react';
 
-export type SpeakingKind = 'shadow' | 'recall' | 'sentence' | 'talk';
+export type SpeakingKind = 'shadow' | 'recall' | 'sentence';
 
 interface SpeakingProps {
   words: WordEntry[];
   onExerciseDone: (word: WordEntry, kind: SpeakingKind, passed: boolean) => void;
-  onConversationDone: (usedWellWords: string[], score: number) => void;
 }
 
 type RecState = 'idle' | 'recording' | 'processing';
@@ -25,7 +23,7 @@ const wordsWithExamples = (words: WordEntry[]) =>
 const exampleOf = (w: WordEntry): string => w.meanings[0].definitions[0].examples[0];
 const definitionOf = (w: WordEntry): string => w.meanings[0]?.definitions[0]?.definition || '';
 
-export const Speaking: React.FC<SpeakingProps> = ({ words, onExerciseDone, onConversationDone }) => {
+export const Speaking: React.FC<SpeakingProps> = ({ words, onExerciseDone }) => {
   const [mode, setMode] = useState<SpeakingKind>('shadow');
   const [recState, setRecState] = useState<RecState>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -118,7 +116,6 @@ export const Speaking: React.FC<SpeakingProps> = ({ words, onExerciseDone, onCon
     { id: 'shadow', label: 'Shadowing', icon: <Ear className="w-3.5 h-3.5" /> },
     { id: 'recall', label: 'Recall', icon: <Lightbulb className="w-3.5 h-3.5" /> },
     { id: 'sentence', label: 'Speak a Sentence', icon: <MessageCircle className="w-3.5 h-3.5" /> },
-    { id: 'talk', label: 'Conversation', icon: <MessagesSquare className="w-3.5 h-3.5" /> },
   ];
 
   const switchMode = (m: SpeakingKind) => {
@@ -153,9 +150,6 @@ export const Speaking: React.FC<SpeakingProps> = ({ words, onExerciseDone, onCon
           <AlertCircle className="w-4 h-4 shrink-0" /> {error}
         </div>
       )}
-
-      {/* ---------- CONVERSATION ---------- */}
-      {mode === 'talk' && <Conversation words={words} onFinished={onConversationDone} />}
 
       {/* ---------- SHADOWING ---------- */}
       {mode === 'shadow' && shadowWord && (

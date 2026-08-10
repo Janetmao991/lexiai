@@ -175,17 +175,6 @@ const App: React.FC = () => {
     if (passed) statsService.record('speaking', allWords());
   };
 
-  const handleConversationDone = (usedWellWords: string[], _score: number) => {
-    const wordsMap = localStorageService.getAllWords();
-    for (const name of usedWellWords) {
-      const entry = Object.values(wordsMap).find(w => w.word.toLowerCase() === name.toLowerCase());
-      if (entry && !entry.mastery?.speakingPassed) {
-        handleSaveWord({ ...entry, mastery: { ...entry.mastery, speakingPassed: true } });
-      }
-    }
-    statsService.record('speaking', allWords());
-  };
-
   const handleDeleteWord = async (wordId: string) => {
     localStorageService.deleteWord(wordId);
     setSavedWords(prev => prev.filter(w => w.word !== wordId));
@@ -322,8 +311,8 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#FDFBF7] text-stone-900 font-sans">
       <header className="bg-white/80 backdrop-blur-md border-b border-stone-200 sticky top-0 z-50">
-        <div className="max-w-5xl mx-auto px-4 h-20 flex justify-between items-center">
-          <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setView(ViewState.DICTIONARY)}>
+        <div className="max-w-6xl mx-auto px-4 h-20 flex justify-between items-center gap-6">
+          <div className="flex items-center gap-3 cursor-pointer group shrink-0" onClick={() => setView(ViewState.DICTIONARY)}>
             <div className="p-2 border border-stone-800 rounded-lg bg-stone-900 text-white shadow-inner">
               <GraduationCap className="w-5 h-5" />
             </div>
@@ -572,7 +561,7 @@ const App: React.FC = () => {
         {view === ViewState.NOTEBOOK && <Notebook words={savedWords} onDelete={handleDeleteWord} onPractice={(w) => { setPracticeTarget(w); setView(ViewState.PRACTICE); }} onUpdateWord={handleSaveWord} />}
         {view === ViewState.FLASHCARDS && <Flashcards words={savedWords} onReview={handleReview} onGameComplete={handleGameComplete} onSpellCorrect={handleSpellCorrect} newCardsToday={stats.daily.newCards ?? 0} />}
         {view === ViewState.PRACTICE && <Practice initialWord={practiceTarget} words={savedWords} onScored={handlePracticeScored} />}
-        {view === ViewState.SPEAKING && <Speaking words={savedWords} onExerciseDone={handleSpeakingDone} onConversationDone={handleConversationDone} />}
+        {view === ViewState.SPEAKING && <Speaking words={savedWords} onExerciseDone={handleSpeakingDone} />}
         {view === ViewState.PODCAST && <Podcast words={savedWords} onGenerated={handlePodcastGenerated} />}
       </main>
     </div>
