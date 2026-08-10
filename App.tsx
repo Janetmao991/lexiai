@@ -42,6 +42,8 @@ const App: React.FC = () => {
   const [codeSent, setCodeSent] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const importInputRef = useRef<HTMLInputElement>(null);
+  // One warning per session when the device can't store the notebook locally.
+  const storageWarnedRef = useRef(false);
 
   // Password recovery (arrived via reset-email link)
   const [showReset, setShowReset] = useState(false);
@@ -129,8 +131,17 @@ const App: React.FC = () => {
 
     const stored = localStorageService.saveWord(w.word, entry);
     if (!stored) {
-      alert('Your browser storage is full — this word could not be saved locally. Export your notebook (Settings → Export JSON) or sign in to keep everything in the cloud.');
-      return;
+      if (!session) {
+        // Guest mode has no cloud backup — losing the local write means losing the word.
+        alert('Your browser storage is full — this word could not be saved locally. Export your notebook (Settings → Export JSON) or sign in to keep everything in the cloud.');
+        return;
+      }
+      // Signed in: the cloud save below still persists it; this device just
+      // can't keep a local copy (iOS storage quota). Warn once per session.
+      if (!storageWarnedRef.current) {
+        storageWarnedRef.current = true;
+        alert("This device's storage is full, so your notebook lives in the cloud only here — new words still save and sync, but the app needs internet to show them.");
+      }
     }
     setSavedWords(prev => {
       const filtered = prev.filter(item => item.word !== w.word);

@@ -59,7 +59,7 @@ export const syncService = {
 
     const mergedWords = syncService.mergeData(localWords, remoteWords);
 
-    localStorageService.importData(mergedWords);
+    const persisted = localStorageService.importData(mergedWords);
 
     // Push anything remote is missing or has stale versions of.
     const toPush: Record<string, WordEntry> = {};
@@ -72,6 +72,21 @@ export const syncService = {
     if (Object.keys(toPush).length > 0) {
       console.log(`[SYNC] Pushing ${Object.keys(toPush).length} words to cloud...`);
       await cloudService.saveAllWords(userId, toPush);
+    }
+
+    if (!persisted) {
+      // The device can't hold the notebook locally (iOS caps localStorage at
+      // ~5MB and a large notebook exceeds it). Serve the merged set from
+      // memory — the cloud stays the source of truth and every app launch
+      // re-pulls it. Without this, the re-read below returns the old (empty)
+      // store and the UI shows 0 words despite a successful pull.
+      console.warn('[SYNC] Local persistence failed (storage quota) — serving notebook from memory');
+      const now = new Date().toISOString();
+      for (const entry of Object.values(mergedWords)) {
+        entry.syncStatus = 'synced';
+        entry.lastSyncTime = now;
+      }
+      return mergedWords;
     }
 
     // Stamp everything synced in ONE write — per-word markAsSynced re-parses
