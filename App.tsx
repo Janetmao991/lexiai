@@ -7,7 +7,7 @@ import { Practice } from './components/Practice.tsx';
 import { Podcast } from './components/Podcast.tsx';
 import { Speaking, SpeakingKind } from './components/Speaking.tsx';
 import { WordEntry, ViewState, SrsRating, UserStats } from './types.ts';
-import { Book, GraduationCap, LayoutGrid, PenTool, X, Cloud, CloudOff, Loader2, Mic2, Database, Terminal, LogOut, Download, Upload, Flame, Settings as SettingsIcon } from 'lucide-react';
+import { Book, GraduationCap, LayoutGrid, Layers, PenTool, X, Cloud, CloudOff, Loader2, Mic2, Radio, Database, Terminal, LogOut, Download, Upload, Flame, Settings as SettingsIcon } from 'lucide-react';
 import { localStorageService } from './services/localStorageService.ts';
 import { syncService } from './services/syncService.ts';
 import { cloudService } from './services/cloudService.ts';
@@ -302,12 +302,12 @@ const App: React.FC = () => {
   };
 
   const navItems = [
-    { id: ViewState.DICTIONARY, label: 'Dictionary', icon: <Book className="w-4 h-4" /> },
-    { id: ViewState.NOTEBOOK, label: 'Notebook', icon: <LayoutGrid className="w-4 h-4" /> },
-    { id: ViewState.FLASHCARDS, label: 'Flashcards', icon: <PenTool className="w-4 h-4" /> },
-    { id: ViewState.PRACTICE, label: 'Practice', icon: <PenTool className="w-4 h-4" /> },
-    { id: ViewState.SPEAKING, label: 'Speaking', icon: <Mic2 className="w-4 h-4" /> },
-    { id: ViewState.PODCAST, label: 'Podcast', icon: <Mic2 className="w-4 h-4" /> },
+    { id: ViewState.DICTIONARY, label: 'Dictionary', icon: <Book className="w-5 h-5" /> },
+    { id: ViewState.NOTEBOOK, label: 'Notebook', icon: <LayoutGrid className="w-5 h-5" /> },
+    { id: ViewState.FLASHCARDS, label: 'Flashcards', icon: <Layers className="w-5 h-5" /> },
+    { id: ViewState.PRACTICE, label: 'Practice', icon: <PenTool className="w-5 h-5" /> },
+    { id: ViewState.SPEAKING, label: 'Speaking', icon: <Mic2 className="w-5 h-5" /> },
+    { id: ViewState.PODCAST, label: 'Podcast', icon: <Radio className="w-5 h-5" /> },
   ];
 
   const accountLabel = session ? (session.user.email || '').split('@')[0] : 'Guest';
@@ -315,7 +315,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#FDFBF7] text-stone-900 font-sans">
       <header className="bg-white/80 backdrop-blur-md border-b border-stone-200 sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-4 h-20 flex justify-between items-center gap-6">
+        <div className="max-w-6xl mx-auto px-4 h-20 flex justify-between items-center gap-3 md:gap-6">
           <div className="flex items-center gap-3 cursor-pointer group shrink-0" onClick={() => setView(ViewState.DICTIONARY)}>
             <div className="p-2 border border-stone-800 rounded-lg bg-stone-900 text-white shadow-inner">
               <GraduationCap className="w-5 h-5" />
@@ -356,7 +356,7 @@ const App: React.FC = () => {
               }`}
             >
               {syncStatus === 'syncing' ? <Loader2 className="w-3 h-3 animate-spin" /> : session ? <Cloud className="w-3 h-3" /> : <CloudOff className="w-3 h-3" />}
-              {accountLabel}
+              <span className="hidden sm:inline">{accountLabel}</span>
             </button>
             <button
               onClick={() => setShowSettings(true)}
@@ -367,7 +367,7 @@ const App: React.FC = () => {
             </button>
             <button
               onClick={() => setShowDebug(!showDebug)}
-              className={`p-2 rounded-lg transition-colors ${showDebug ? 'bg-stone-800 text-white' : 'text-stone-300 hover:text-stone-900'}`}
+              className={`hidden md:block p-2 rounded-lg transition-colors ${showDebug ? 'bg-stone-800 text-white' : 'text-stone-300 hover:text-stone-900'}`}
               title="Debug Sync"
             >
                <Terminal className="w-4 h-4" />
@@ -560,7 +560,7 @@ const App: React.FC = () => {
         </div>
       )}
 
-      <main className="max-w-5xl mx-auto px-4 py-12">
+      <main className="max-w-5xl mx-auto px-4 py-12 pb-28 md:pb-12">
         {view === ViewState.DICTIONARY && <Dictionary onSave={handleSaveWord} savedWords={savedWords} />}
         {view === ViewState.NOTEBOOK && <Notebook words={savedWords} onDelete={handleDeleteWord} onPractice={(w) => { setPracticeTarget(w); setView(ViewState.PRACTICE); }} onUpdateWord={handleSaveWord} />}
         {view === ViewState.FLASHCARDS && <Flashcards words={savedWords} onReview={handleReview} onGameComplete={handleGameComplete} onSpellCorrect={handleSpellCorrect} newCardsToday={stats.daily.newCards ?? 0} />}
@@ -568,6 +568,27 @@ const App: React.FC = () => {
         {view === ViewState.SPEAKING && <Speaking words={savedWords} onExerciseDone={handleSpeakingDone} />}
         {view === ViewState.PODCAST && <Podcast words={savedWords} onGenerated={handlePodcastGenerated} />}
       </main>
+
+      {/* Mobile bottom tab bar — the desktop nav above is hidden below md */}
+      <nav
+        className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-white/90 backdrop-blur-md border-t border-stone-200"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        <div className="grid grid-cols-6">
+          {navItems.map(item => (
+            <button
+              key={item.id}
+              onClick={() => setView(item.id)}
+              className={`flex flex-col items-center gap-1 pt-2.5 pb-2 text-[10px] font-semibold transition-colors ${
+                view === item.id ? 'text-stone-900' : 'text-stone-400'
+              }`}
+            >
+              {item.icon}
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </nav>
     </div>
   );
 };
