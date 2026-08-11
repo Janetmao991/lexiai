@@ -53,8 +53,22 @@ export const AskAI: React.FC<AskAIProps> = ({ onLookup }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   // True while a CJK IME is composing — Enter then confirms the characters,
-  // it must not submit the form.
+  // it must not submit the form. Safari fires compositionend BEFORE the
+  // confirming keydown (opposite of Chrome), so we also remember WHEN
+  // composition ended and swallow Enter within a grace window.
   const composingRef = useRef(false);
+  const compEndAtRef = useRef(0);
+  // Height of the software keyboard (iOS PWA) so the panel can lift above it.
+  const [kbOffset, setKbOffset] = useState(0);
+
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () => setKbOffset(Math.max(0, window.innerHeight - vv.height - vv.offsetTop));
+    vv.addEventListener('resize', onResize);
+    vv.addEventListener('scroll', onResize);
+    return () => { vv.removeEventListener('resize', onResize); vv.removeEventListener('scroll', onResize); };
+  }, []);
   // Full model-side conversation (text + image parts) so follow-ups keep
   // context. Only the most recent image's bytes are retained; older ones
   // collapse to placeholders to keep requests small.
@@ -160,7 +174,10 @@ export const AskAI: React.FC<AskAIProps> = ({ onLookup }) => {
       )}
 
       {open && (
-        <div className="fixed bottom-24 md:bottom-6 right-4 md:right-6 z-50 w-[min(26rem,calc(100vw-2rem))] bg-white rounded-3xl shadow-2xl border border-stone-200 flex flex-col overflow-hidden animate-fade-in-up" style={{ maxHeight: 'min(34rem, 70vh)' }}>
+        <div
+          className="fixed bottom-24 md:bottom-6 right-4 md:right-6 z-50 w-[min(26rem,calc(100vw-2rem))] bg-white rounded-3xl shadow-2xl border border-stone-200 flex flex-col overflow-hidden animate-fade-in-up"
+          style={{ maxHeight: `min(34rem, calc(70vh - ${kbOffset}px))`, transform: kbOffset ? `translateY(-${kbOffset}px)` : undefined, transition: 'transform 0.15s ease-out' }}
+        >
           <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100 bg-stone-50/60">
             <div className="flex items-center gap-2">
               <div className="p-1.5 bg-stone-900 text-white rounded-lg"><Sparkles className="w-3.5 h-3.5" /></div>
@@ -260,11 +277,16 @@ export const AskAI: React.FC<AskAIProps> = ({ onLookup }) => {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onCompositionStart={() => { composingRef.current = true; }}
-              onCompositionEnd={() => { composingRef.current = false; }}
+              onCompositionEnd={() => { composingRef.current = false; compEndAtRef.current = Date.now(); }}
               onKeyDown={(e) => {
-                // While a Chinese/Japanese IME is composing, Enter confirms the
-                // characters — swallow it so the form doesn't submit pinyin.
-                if (e.key === 'Enter' && (composingRef.current || (e.nativeEvent as any).isComposing)) e.preventDefault();
+                // While a Chinese/Japanese IME is composing (or just confirmed —
+                // Safari's event order differs from Chrome's), Enter selects the
+                // characters — swallow it so the form doesn't submit mid-typing.
+                const imeActive = composingRef.current
+                  || (e.nativeEvent as any).isComposing
+                  || (e.nativeEvent as any).keyCode === 229
+                  || Date.now() - compEndAtRef.current < 200;
+                if (e.key === 'Enter' && imeActive) e.preventDefault();
               }}
               onPaste={(e) => { const f = e.clipboardData?.files?.[0]; if (f) { e.preventDefault(); attachFile(f); } }}
               placeholder={!hasApiKey() ? 'Add your API key in Settings first' : pendingImage ? 'Ask about the image (optional)…' : 'Ask about any word or phrase…'}
