@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { askLexi, askLexiImage, analyzeImageText, hasApiKey, ImageWordPick } from '../services/geminiService';
+import { askLexiTurn, analyzeImageText, hasApiKey, ImageWordPick, LexiPart } from '../services/geminiService';
 import { Sparkles, X, Send, Loader2, Eraser, ImagePlus, Search } from 'lucide-react';
 
 interface Msg {
@@ -52,6 +52,28 @@ export const AskAI: React.FC<AskAIProps> = ({ onLookup }) => {
   const bodyRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // True while a CJK IME is composing — Enter then confirms the characters,
+  // it must not submit the form.
+  const composingRef = useRef(false);
+  // Full model-side conversation (text + image parts) so follow-ups keep
+  // context. Only the most recent image's bytes are retained; older ones
+  // collapse to placeholders to keep requests small.
+  const historyRef = useRef<{ role: 'user' | 'model'; parts: LexiPart[] }[]>([]);
+
+  const pushHistory = (role: 'user' | 'model', parts: LexiPart[]) => {
+    historyRef.current.push({ role, parts });
+    let latestImageKept = false;
+    for (let i = historyRef.current.length - 1; i >= 0; i--) {
+      historyRef.current[i].parts = historyRef.current[i].parts.map(p => {
+        if ('inlineData' in p) {
+          if (latestImageKept) return { text: '[an image the learner sent earlier]' };
+          latestImageKept = true;
+        }
+        return p;
+      });
+    }
+    if (historyRef.current.length > 16) historyRef.current = historyRef.current.slice(-16);
+  };
 
   useEffect(() => {
     bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight, behavior: 'smooth' });
@@ -86,9 +108,14 @@ export const AskAI: React.FC<AskAIProps> = ({ onLookup }) => {
     setError(null);
     const img = pendingImage;
     setPendingImage(null);
-    const history = messages;
-    setMessages(prev => [...prev, { role: 'user', text: q || 'Explain this and pick out the advanced words', image: img?.dataUrl }]);
+    const label = q || 'Explain this and pick out the advanced words';
+    setMessages(prev => [...prev, { role: 'user', text: label, image: img?.dataUrl }]);
     setBusy(true);
+
+    const turnParts: LexiPart[] = [];
+    if (img) turnParts.push({ inlineData: { data: img.base64, mimeType: img.mimeType } });
+    turnParts.push({ text: label });
+
     try {
       if (img && !q) {
         // No question → default action: explain the text, break it down,
@@ -97,13 +124,15 @@ export const AskAI: React.FC<AskAIProps> = ({ onLookup }) => {
         const parts = [a.explanation];
         if (a.breakdown?.length) parts.push(a.breakdown.map(b => `· ${b}`).join('\n'));
         if (a.words?.length) parts.push('Worth learning — tap a word to look it up:');
-        setMessages(prev => [...prev, { role: 'model', text: parts.filter(Boolean).join('\n\n'), words: a.words?.length ? a.words : undefined }]);
-      } else if (img) {
-        const reply = await askLexiImage(img.base64, img.mimeType, q);
-        setMessages(prev => [...prev, { role: 'model', text: reply }]);
+        const replyText = parts.filter(Boolean).join('\n\n');
+        setMessages(prev => [...prev, { role: 'model', text: replyText, words: a.words?.length ? a.words : undefined }]);
+        pushHistory('user', turnParts);
+        pushHistory('model', [{ text: replyText }]);
       } else {
-        const reply = await askLexi(q, history.filter(m => !m.image && !m.words).slice(-10));
+        const reply = await askLexiTurn(historyRef.current, turnParts);
         setMessages(prev => [...prev, { role: 'model', text: reply }]);
+        pushHistory('user', turnParts);
+        pushHistory('model', [{ text: reply }]);
       }
     } catch (e: any) {
       setError(friendlyError(e));
@@ -138,7 +167,7 @@ export const AskAI: React.FC<AskAIProps> = ({ onLookup }) => {
             </div>
             <div className="flex items-center gap-1">
               {messages.length > 0 && (
-                <button onClick={() => { setMessages([]); setError(null); }} className="p-2 text-stone-300 hover:text-stone-900" title="Clear conversation">
+                <button onClick={() => { setMessages([]); setError(null); historyRef.current = []; }} className="p-2 text-stone-300 hover:text-stone-900" title="Clear conversation">
                   <Eraser className="w-4 h-4" />
                 </button>
               )}
@@ -226,6 +255,13 @@ export const AskAI: React.FC<AskAIProps> = ({ onLookup }) => {
               ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
+              onCompositionStart={() => { composingRef.current = true; }}
+              onCompositionEnd={() => { composingRef.current = false; }}
+              onKeyDown={(e) => {
+                // While a Chinese/Japanese IME is composing, Enter confirms the
+                // characters — swallow it so the form doesn't submit pinyin.
+                if (e.key === 'Enter' && (composingRef.current || (e.nativeEvent as any).isComposing)) e.preventDefault();
+              }}
               onPaste={(e) => { const f = e.clipboardData?.files?.[0]; if (f) { e.preventDefault(); attachFile(f); } }}
               placeholder={!hasApiKey() ? 'Add your API key in Settings first' : pendingImage ? 'Ask about the image (optional)…' : 'Ask about any word or phrase…'}
               className="flex-1 px-4 py-3 bg-stone-50 border border-stone-200 rounded-full outline-none focus:ring-2 focus:ring-stone-900 text-sm min-w-0"

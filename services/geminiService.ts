@@ -248,39 +248,27 @@ Rules:
 4. When explaining a word: meaning in one line, one natural example, one nuance vs its closest synonym.
 5. If asked for a word from a Chinese meaning, give the best 2-3 English options, closest first, one line each on how they differ.`;
 
-export const askLexi = async (
-  question: string,
-  history: { role: 'user' | 'model'; text: string }[] = []
+/** One message part in the Ask Lexi conversation — plain text or an inline image. */
+export type LexiPart = { text: string } | { inlineData: { data: string; mimeType: string } };
+
+/** One conversational turn with Lexi. The caller owns the history (including
+    image parts), so follow-up questions keep full context — "what does the
+    second word mean?" still works after a photo was sent. */
+export const askLexiTurn = async (
+  history: { role: 'user' | 'model'; parts: LexiPart[] }[],
+  parts: LexiPart[]
 ): Promise<string> => {
   const ai = getAi();
   const chat = ai.chats.create({
     model: getTextModel(),
-    history: history.map(h => ({ role: h.role, parts: [{ text: h.text }] })),
+    history,
     config: {
       thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
       systemInstruction: LEXI_PERSONA,
       temperature: 0.6,
     },
   });
-  const response = await chat.sendMessage({ message: question });
-  return response.text || 'Hmm, no answer came back — try rephrasing?';
-};
-
-/** Ask Lexi about an image (screenshot of an article, a book page, a slide…). */
-export const askLexiImage = async (base64: string, mimeType: string, question: string): Promise<string> => {
-  const ai = getAi();
-  const response = await generateWithRetry(ai, {
-    model: getTextModel(),
-    contents: [{ parts: [
-      { inlineData: { data: base64, mimeType } },
-      { text: question },
-    ] }],
-    config: {
-      thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
-      systemInstruction: LEXI_PERSONA,
-      temperature: 0.6,
-    },
-  });
+  const response = await chat.sendMessage({ message: parts });
   return response.text || 'Hmm, no answer came back — try rephrasing?';
 };
 
