@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { askLexi, askLexiImage, extractWordsFromImage, hasApiKey, ImageWordPick } from '../services/geminiService';
+import { askLexi, askLexiImage, analyzeImageText, hasApiKey, ImageWordPick } from '../services/geminiService';
 import { Sparkles, X, Send, Loader2, Eraser, ImagePlus, Search } from 'lucide-react';
 
 interface Msg {
@@ -87,15 +87,17 @@ export const AskAI: React.FC<AskAIProps> = ({ onLookup }) => {
     const img = pendingImage;
     setPendingImage(null);
     const history = messages;
-    setMessages(prev => [...prev, { role: 'user', text: q || 'Find the advanced words in this image', image: img?.dataUrl }]);
+    setMessages(prev => [...prev, { role: 'user', text: q || 'Explain this and pick out the advanced words', image: img?.dataUrl }]);
     setBusy(true);
     try {
       if (img && !q) {
-        // No question → default action: harvest advanced vocabulary.
-        const words = await extractWordsFromImage(img.base64, img.mimeType);
-        setMessages(prev => [...prev, words.length
-          ? { role: 'model', text: 'Here are the advanced words I spotted — tap one to look it up:', words }
-          : { role: 'model', text: "I couldn't find readable English text in that image — try a clearer shot?" }]);
+        // No question → default action: explain the text, break it down,
+        // then surface the advanced vocabulary as lookup chips.
+        const a = await analyzeImageText(img.base64, img.mimeType);
+        const parts = [a.explanation];
+        if (a.breakdown?.length) parts.push(a.breakdown.map(b => `· ${b}`).join('\n'));
+        if (a.words?.length) parts.push('Worth learning — tap a word to look it up:');
+        setMessages(prev => [...prev, { role: 'model', text: parts.filter(Boolean).join('\n\n'), words: a.words?.length ? a.words : undefined }]);
       } else if (img) {
         const reply = await askLexiImage(img.base64, img.mimeType, q);
         setMessages(prev => [...prev, { role: 'model', text: reply }]);
@@ -151,7 +153,7 @@ export const AskAI: React.FC<AskAIProps> = ({ onLookup }) => {
                 <p>· what does "hedge" mean here?</p>
                 <p>· 表示"审慎乐观"用英文怎么说?</p>
                 <p>· difference between raise and rise?</p>
-                <p className="not-italic flex items-center gap-1.5 text-stone-500"><ImagePlus className="w-3.5 h-3.5" /> or send a photo of any English text — I'll pick out the advanced words for you.</p>
+                <p className="not-italic flex items-center gap-1.5 text-stone-500"><ImagePlus className="w-3.5 h-3.5" /> or send a photo of any English text — I'll explain it, break it down, and pick out the advanced words.</p>
               </div>
             )}
             {messages.map((m, i) => (
@@ -197,7 +199,7 @@ export const AskAI: React.FC<AskAIProps> = ({ onLookup }) => {
                   title="Remove image"
                 ><X className="w-3 h-3" /></button>
               </div>
-              <p className="text-xs text-stone-400">Send with a question — or send as-is and I'll extract the advanced words.</p>
+              <p className="text-xs text-stone-400">Send with a question — or send as-is and I'll explain it, break it down, and pull out the advanced words.</p>
             </div>
           )}
 

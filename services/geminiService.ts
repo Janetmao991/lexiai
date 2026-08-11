@@ -286,9 +286,17 @@ export const askLexiImage = async (base64: string, mimeType: string, question: s
 
 export interface ImageWordPick { word: string; gloss: string }
 
-const imageWordsSchema = {
+export interface ImageTextAnalysis {
+  explanation: string;
+  breakdown: string[];
+  words: ImageWordPick[];
+}
+
+const imageAnalysisSchema = {
   type: Type.OBJECT,
   properties: {
+    explanation: { type: Type.STRING },
+    breakdown: { type: Type.ARRAY, items: { type: Type.STRING } },
     words: {
       type: Type.ARRAY,
       items: {
@@ -301,27 +309,34 @@ const imageWordsSchema = {
       },
     },
   },
-  required: ["words"],
+  required: ["explanation", "breakdown", "words"],
 };
 
-/** Pull the advanced vocabulary out of a photo/screenshot of English text. */
-export const extractWordsFromImage = async (base64: string, mimeType: string): Promise<ImageWordPick[]> => {
+/** Explain + break down the English text in a photo/screenshot, and pull out
+    the advanced vocabulary worth learning. */
+export const analyzeImageText = async (base64: string, mimeType: string): Promise<ImageTextAnalysis> => {
   const ai = getAi();
   const response = await generateWithRetry(ai, {
     model: getTextModel(),
     contents: [{ parts: [
       { inlineData: { data: base64, mimeType } },
-      { text: `Read the English text in this image. Pick the advanced words or phrases (C1+) most worth learning for an advanced learner with a business/finance focus — skip common words entirely. At most 10, most valuable first. For each, give a gloss of at most 8 words matching how it is used in this image. If the image contains no readable English text, return an empty list.` },
+      { text: `Read the English text in this image (a sentence, a paragraph, or a page). You are helping an advanced learner (C1, Chinese native, business/finance focus) truly understand it.
+
+1. "explanation": restate what the text means in clear, plain English — 1-3 sentences. If it's a long passage, explain the core point. No markdown symbols.
+2. "breakdown": break down the key sentence(s) a C1 learner could stumble on — grammar structure, idioms, phrasal verbs, references, or logic. Each item ONE short line in the form "quoted part — what it does / how it works". 2-6 items; fewer if the text is simple.
+3. "words": the advanced words or phrases (C1+) most worth learning from this text — skip common words entirely. At most 10, most valuable first, each with a gloss of at most 8 words matching how it is used here.
+
+If the image contains no readable English text, set explanation to "I couldn't find readable English text in this image — try a clearer shot?", and leave breakdown and words empty.` },
     ] }],
     config: {
       thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
       responseMimeType: "application/json",
-      responseSchema: imageWordsSchema,
-      temperature: 0.2,
+      responseSchema: imageAnalysisSchema,
+      temperature: 0.3,
     },
   });
-  const parsed = response.text ? JSON.parse(response.text) : { words: [] };
-  return parsed.words || [];
+  const parsed = response.text ? JSON.parse(response.text) : null;
+  return parsed || { explanation: 'Hmm, no answer came back — try again?', breakdown: [], words: [] };
 };
 
 export const lookupWord = async (word: string): Promise<WordEntry | null> => {
