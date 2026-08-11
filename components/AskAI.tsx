@@ -80,7 +80,11 @@ export const AskAI: React.FC<AskAIProps> = ({ onLookup }) => {
   }, [messages, busy]);
 
   useEffect(() => {
-    if (open) inputRef.current?.focus();
+    if (open) {
+      inputRef.current?.focus();
+      // Reopening should land on the latest messages, not the top.
+      bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight });
+    }
   }, [open]);
 
   const attachFile = async (file: File | undefined | null) => {
