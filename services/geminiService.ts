@@ -240,6 +240,14 @@ export const askAboutContext = async (
 };
 
 // Global "Ask Lexi" chat — reachable from every page for quick word/usage questions.
+const LEXI_PERSONA = `You are Lexi — a sharp, warm English tutor living inside a dictionary app, chatting with an advanced learner (Chinese native, C1, finance background).
+Rules:
+1. Questions may be in English or Chinese; answer primarily in English (simple, clear), adding a short Chinese gloss for the key term when the question was in Chinese.
+2. Keep answers SHORT: under 120 words. One idea per line, blank line between points.
+3. NO markdown symbols (no *, #, backticks). Plain text only.
+4. When explaining a word: meaning in one line, one natural example, one nuance vs its closest synonym.
+5. If asked for a word from a Chinese meaning, give the best 2-3 English options, closest first, one line each on how they differ.`;
+
 export const askLexi = async (
   question: string,
   history: { role: 'user' | 'model'; text: string }[] = []
@@ -250,18 +258,70 @@ export const askLexi = async (
     history: history.map(h => ({ role: h.role, parts: [{ text: h.text }] })),
     config: {
       thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
-      systemInstruction: `You are Lexi — a sharp, warm English tutor living inside a dictionary app, chatting with an advanced learner (Chinese native, C1, finance background).
-Rules:
-1. Questions may be in English or Chinese; answer primarily in English (simple, clear), adding a short Chinese gloss for the key term when the question was in Chinese.
-2. Keep answers SHORT: under 120 words. One idea per line, blank line between points.
-3. NO markdown symbols (no *, #, backticks). Plain text only.
-4. When explaining a word: meaning in one line, one natural example, one nuance vs its closest synonym.
-5. If asked for a word from a Chinese meaning, give the best 2-3 English options, closest first, one line each on how they differ.`,
+      systemInstruction: LEXI_PERSONA,
       temperature: 0.6,
     },
   });
   const response = await chat.sendMessage({ message: question });
   return response.text || 'Hmm, no answer came back — try rephrasing?';
+};
+
+/** Ask Lexi about an image (screenshot of an article, a book page, a slide…). */
+export const askLexiImage = async (base64: string, mimeType: string, question: string): Promise<string> => {
+  const ai = getAi();
+  const response = await generateWithRetry(ai, {
+    model: getTextModel(),
+    contents: [{ parts: [
+      { inlineData: { data: base64, mimeType } },
+      { text: question },
+    ] }],
+    config: {
+      thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
+      systemInstruction: LEXI_PERSONA,
+      temperature: 0.6,
+    },
+  });
+  return response.text || 'Hmm, no answer came back — try rephrasing?';
+};
+
+export interface ImageWordPick { word: string; gloss: string }
+
+const imageWordsSchema = {
+  type: Type.OBJECT,
+  properties: {
+    words: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          word: { type: Type.STRING },
+          gloss: { type: Type.STRING },
+        },
+        required: ["word", "gloss"],
+      },
+    },
+  },
+  required: ["words"],
+};
+
+/** Pull the advanced vocabulary out of a photo/screenshot of English text. */
+export const extractWordsFromImage = async (base64: string, mimeType: string): Promise<ImageWordPick[]> => {
+  const ai = getAi();
+  const response = await generateWithRetry(ai, {
+    model: getTextModel(),
+    contents: [{ parts: [
+      { inlineData: { data: base64, mimeType } },
+      { text: `Read the English text in this image. Pick the advanced words or phrases (C1+) most worth learning for an advanced learner with a business/finance focus — skip common words entirely. At most 10, most valuable first. For each, give a gloss of at most 8 words matching how it is used in this image. If the image contains no readable English text, return an empty list.` },
+    ] }],
+    config: {
+      thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
+      responseMimeType: "application/json",
+      responseSchema: imageWordsSchema,
+      temperature: 0.2,
+    },
+  });
+  const parsed = response.text ? JSON.parse(response.text) : { words: [] };
+  return parsed.words || [];
 };
 
 export const lookupWord = async (word: string): Promise<WordEntry | null> => {

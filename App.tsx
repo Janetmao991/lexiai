@@ -44,6 +44,8 @@ const App: React.FC = () => {
   const importInputRef = useRef<HTMLInputElement>(null);
   // One warning per session when the device can't store the notebook locally.
   const storageWarnedRef = useRef(false);
+  // Lookup requested from outside Dictionary (word chips in Ask Lexi).
+  const [dictLookup, setDictLookup] = useState<{ word: string; n: number } | null>(null);
 
   // Password recovery (arrived via reset-email link)
   const [showReset, setShowReset] = useState(false);
@@ -553,7 +555,7 @@ const App: React.FC = () => {
 
       {showProgress && <ProgressPanel stats={stats} words={savedWords} onClose={() => setShowProgress(false)} />}
       {showSettings && <Settings onClose={() => { setShowSettings(false); setKeyConfigured(hasApiKey()); }} />}
-      <AskAI />
+      <AskAI onLookup={(word) => { setDictLookup({ word, n: Date.now() }); setView(ViewState.DICTIONARY); }} />
 
       {!keyConfigured && (
         <div className="bg-amber-50 border-b border-amber-100">
@@ -572,7 +574,7 @@ const App: React.FC = () => {
       )}
 
       <main className="max-w-5xl mx-auto px-4 py-12 pb-28 md:pb-12">
-        {view === ViewState.DICTIONARY && <Dictionary onSave={handleSaveWord} savedWords={savedWords} />}
+        {view === ViewState.DICTIONARY && <Dictionary onSave={handleSaveWord} savedWords={savedWords} lookupRequest={dictLookup} />}
         {view === ViewState.NOTEBOOK && <Notebook words={savedWords} onDelete={handleDeleteWord} onPractice={(w) => { setPracticeTarget(w); setView(ViewState.PRACTICE); }} onUpdateWord={handleSaveWord} />}
         {view === ViewState.FLASHCARDS && <Flashcards words={savedWords} onReview={handleReview} onGameComplete={handleGameComplete} onSpellCorrect={handleSpellCorrect} newCardsToday={stats.daily.newCards ?? 0} />}
         {view === ViewState.PRACTICE && <Practice initialWord={practiceTarget} words={savedWords} onScored={handlePracticeScored} />}

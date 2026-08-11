@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { WordEntry, SynonymComparison, SentenceAnalysis } from '../types';
 import { lookupWord, playPronunciation, compareSynonyms, analyzeSentence } from '../services/geminiService';
 import { Search, Volume2, Save, Loader2, GitCompare, FileText, Sparkles, Check, Layers, Tag, TrendingUp } from 'lucide-react';
@@ -8,11 +8,13 @@ import { DailyRead } from './DailyRead';
 interface DictionaryProps {
   onSave: (word: WordEntry) => void;
   savedWords: WordEntry[];
+  /** External lookup request (e.g. a word tapped in Ask Lexi); `n` forces re-runs of the same word. */
+  lookupRequest?: { word: string; n: number } | null;
 }
 
 type DictionaryMode = 'DEFINE' | 'COMPARE' | 'ANALYZE';
 
-export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords }) => {
+export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, lookupRequest }) => {
   const [activeMode, setActiveMode] = useState<DictionaryMode>('DEFINE');
   const [loading, setLoading] = useState(false);
   const [savingWord, setSavingWord] = useState<string | null>(null);
@@ -65,6 +67,11 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords }) =>
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (lookupRequest?.word) doLookup(lookupRequest.word);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lookupRequest?.n]);
 
   const handleLookup = (e: React.FormEvent) => {
     e.preventDefault();
