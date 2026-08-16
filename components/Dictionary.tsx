@@ -272,7 +272,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
                                   {d.definition}
                                 </p>
                                 {d.gloss && (
-                                  <p className="text-lg leading-snug text-amber-700/90 -mt-3">{d.gloss}</p>
+                                  <p className="gloss leading-snug -mt-3">{d.gloss}</p>
                                 )}
 
                                 {d.synonyms && d.synonyms.length > 0 && (

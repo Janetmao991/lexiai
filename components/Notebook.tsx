@@ -307,7 +307,7 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onPractice,
                                                 {def.definition}
                                             </p>
                                             {def.gloss && (
-                                                <p className="text-lg leading-snug text-amber-700/90 -mt-2">{def.gloss}</p>
+                                                <p className="gloss leading-snug -mt-2">{def.gloss}</p>
                                             )}
 
                                             {def.synonyms && def.synonyms.length > 0 && (

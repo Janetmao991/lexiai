@@ -29,7 +29,7 @@ export const getGlossLang = (): string =>
 const glossInstruction = (lang: string): string => {
   if (!lang) return '';
   const name = GLOSS_LANGS.find(g => g.id === lang)?.name || lang;
-  return `\n      5b. NATIVE GLOSS: For EVERY definition, fill "gloss" with a concise ${name} gloss of THAT specific sense (a few words; use standard ${name} finance/business terminology for finance senses). Never leave it empty.`;
+  return `\n      5b. NATIVE GLOSS: For EVERY definition, fill "gloss" with a ${name} gloss of THAT specific sense. Requirements: (a) lead with the neutral core meaning as a dictionary would (e.g. for "rehash": 重新表述；重新整理（旧材料）), then, only if the word carries a register or connotation, append it in brackets, e.g. （常含贬义：老调重弹）; (b) never reduce a neutral word to a single idiom or slang gloss — idioms may appear only as the bracketed connotation note, never as the whole gloss; (c) 5–20 characters, separated by "；"; (d) use standard ${name} finance/business terminology for finance senses. Never leave it empty.`;
 };
 
 const getAi = () => {
