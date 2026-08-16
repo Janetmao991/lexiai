@@ -7,7 +7,3 @@ dist/
 data-backup/
 dist/
 dev-dist/
-
-# local desktop shell build outputs
-desktop/*.app
-desktop/*.icns

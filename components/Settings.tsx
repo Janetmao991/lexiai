@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
-import { X, KeyRound, Eye, EyeOff, Check, ExternalLink } from 'lucide-react';
+import { X, KeyRound, Eye, EyeOff, Check, ExternalLink, Languages } from 'lucide-react';
+import { GLOSS_STORAGE, GLOSS_LANGS } from '../services/geminiService';
 
 interface SettingsProps {
   onClose: () => void;
@@ -17,6 +18,7 @@ const MODELS = [
 export const Settings: React.FC<SettingsProps> = ({ onClose }) => {
   const [apiKey, setApiKey] = useState(() => localStorage.getItem(KEY_STORAGE) || '');
   const [model, setModel] = useState(() => localStorage.getItem(MODEL_STORAGE) || MODELS[0].id);
+  const [gloss, setGloss] = useState(() => localStorage.getItem(GLOSS_STORAGE) || '');
   const [showKey, setShowKey] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -26,6 +28,8 @@ export const Settings: React.FC<SettingsProps> = ({ onClose }) => {
     if (apiKey.trim()) localStorage.setItem(KEY_STORAGE, apiKey.trim());
     else localStorage.removeItem(KEY_STORAGE);
     localStorage.setItem(MODEL_STORAGE, model);
+    if (gloss) localStorage.setItem(GLOSS_STORAGE, gloss);
+    else localStorage.removeItem(GLOSS_STORAGE);
     setSaved(true);
     setTimeout(onClose, 700);
   };
@@ -79,6 +83,28 @@ export const Settings: React.FC<SettingsProps> = ({ onClose }) => {
               <p className="text-xs text-stone-400">{m.hint}</p>
             </button>
           ))}
+        </div>
+
+        <div className="space-y-3">
+          <label className="block text-xs font-bold uppercase tracking-wider text-stone-400">
+            <Languages className="w-3.5 h-3.5 inline mr-1" /> Definition gloss
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {GLOSS_LANGS.map(g => (
+              <button
+                key={g.id}
+                onClick={() => setGloss(g.id)}
+                className={`px-3.5 py-2 rounded-lg border text-sm transition-all ${
+                  gloss === g.id ? 'border-stone-900 bg-stone-900 text-white' : 'border-stone-200 text-stone-600 hover:border-stone-400'
+                }`}
+              >
+                {g.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-stone-400 leading-relaxed">
+            Adds a short native-language gloss under each English definition. Off keeps definitions English-only.
+          </p>
         </div>
 
         <button

@@ -44,10 +44,7 @@ export default defineConfig(({ mode }) => {
       // This ensures process.env.* works in the Vite build
       'process.env.API_KEY': JSON.stringify(env.API_KEY),
       'process.env.SUPABASE_URL': JSON.stringify(env.SUPABASE_URL),
-      'process.env.SUPABASE_KEY': JSON.stringify(env.SUPABASE_KEY),
-      // Optional gloss language for definitions (e.g. "zh"). Local-only: set in
-      // .env.local; leave unset on Vercel so the public build stays English-only.
-      'process.env.GLOSS_LANG': JSON.stringify(env.GLOSS_LANG || '')
+      'process.env.SUPABASE_KEY': JSON.stringify(env.SUPABASE_KEY)
     }
   };
 });

@@ -11,12 +11,24 @@ export const hasApiKey = (): boolean => Boolean(getApiKey());
 export const getTextModel = (): string =>
   (typeof localStorage !== 'undefined' && localStorage.getItem('lexiai_model')) || 'gemini-3-flash-preview';
 
-// Build-time gloss language (e.g. "zh"). Empty in the public build → no gloss.
-export const GLOSS_LANG: string = process.env.GLOSS_LANG || '';
-const GLOSS_LANG_NAMES: Record<string, string> = { zh: 'Simplified Chinese', ja: 'Japanese', ko: 'Korean', es: 'Spanish', fr: 'French', de: 'German' };
-const glossInstruction = (): string => {
-  if (!GLOSS_LANG) return '';
-  const name = GLOSS_LANG_NAMES[GLOSS_LANG] || GLOSS_LANG;
+// User-selectable gloss language (Settings → "Definition gloss"). Stored per
+// browser; empty/absent = English-only definitions (the default).
+export const GLOSS_STORAGE = 'lexiai_gloss_lang';
+export const GLOSS_LANGS: { id: string; label: string; name: string }[] = [
+  { id: '',   label: 'Off',       name: '' },
+  { id: 'zh', label: '中文',      name: 'Simplified Chinese' },
+  { id: 'ja', label: '日本語',    name: 'Japanese' },
+  { id: 'ko', label: '한국어',    name: 'Korean' },
+  { id: 'es', label: 'Español',   name: 'Spanish' },
+  { id: 'fr', label: 'Français',  name: 'French' },
+  { id: 'de', label: 'Deutsch',   name: 'German' },
+  { id: 'pt', label: 'Português', name: 'Portuguese' },
+];
+export const getGlossLang = (): string =>
+  (typeof localStorage !== 'undefined' && localStorage.getItem(GLOSS_STORAGE)) || '';
+const glossInstruction = (lang: string): string => {
+  if (!lang) return '';
+  const name = GLOSS_LANGS.find(g => g.id === lang)?.name || lang;
   return `\n      5b. NATIVE GLOSS: For EVERY definition, fill "gloss" with a concise ${name} gloss of THAT specific sense (a few words; use standard ${name} finance/business terminology for finance senses). Never leave it empty.`;
 };
 
@@ -79,7 +91,7 @@ async function decodeAudioData(
 }
 
 // Schemas for JSON responses
-const dictionarySchema = {
+const dictionarySchema = (withGloss: boolean) => ({
   type: Type.OBJECT,
   properties: {
     word: { type: Type.STRING },
@@ -97,12 +109,12 @@ const dictionarySchema = {
               type: Type.OBJECT,
               properties: {
                 definition: { type: Type.STRING },
-                ...(GLOSS_LANG ? { gloss: { type: Type.STRING } } : {}),
+                ...(withGloss ? { gloss: { type: Type.STRING } } : {}),
                 synonyms: { type: Type.ARRAY, items: { type: Type.STRING } },
                 examples: { type: Type.ARRAY, items: { type: Type.STRING } },
                 collocations: { type: Type.ARRAY, items: { type: Type.STRING } },
               },
-              required: ["definition", ...(GLOSS_LANG ? ["gloss"] : []), "synonyms", "examples", "collocations"],
+              required: ["definition", ...(withGloss ? ["gloss"] : []), "synonyms", "examples", "collocations"],
             },
           },
         },
@@ -122,7 +134,7 @@ const dictionarySchema = {
     },
   },
   required: ["word", "ipa", "meanings"],
-};
+});
 
 const practiceSchema = {
   type: Type.OBJECT,
@@ -339,6 +351,7 @@ If the image contains no readable English text, set explanation to "I couldn't f
 
 export const lookupWord = async (word: string): Promise<WordEntry | null> => {
   const ai = getAi();
+  const glossLang = getGlossLang();
   try {
     const response = await generateWithRetry(ai, {
       model: getTextModel(), 
@@ -350,12 +363,12 @@ export const lookupWord = async (word: string): Promise<WordEntry | null> => {
       2. If you correct it, set "wasCorrected" to true.
       3. Provide IPA, detailed meanings, and advanced usage examples.
       4. ESSENTIAL: Provide 4-6 natural collocations for each definition.
-      5. FINANCIAL FOCUS: If the word has a specific meaning in Finance, Business, or Economics, ENSURE you include that definition and set the partOfSpeech to exactly "Noun (Finance)", "Verb (Finance)", etc.${glossInstruction()}
+      5. FINANCIAL FOCUS: If the word has a specific meaning in Finance, Business, or Economics, ENSURE you include that definition and set the partOfSpeech to exactly "Noun (Finance)", "Verb (Finance)", etc.${glossInstruction(glossLang)}
       6. REVERSE LOOKUP: The input may be CHINESE (or an English description of a meaning) instead of an English word. In that case, pick the single closest English word/phrase as the headword and fill "candidates" with 2-3 OTHER English words that also express it, ordered closest-in-meaning first, each with a one-line "nuance" explaining when it fits better than the headword. For a normal English-word lookup, leave "candidates" as [].`,
       config: {
         thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
         responseMimeType: "application/json",
-        responseSchema: dictionarySchema,
+        responseSchema: dictionarySchema(Boolean(glossLang)),
         temperature: 0.1,
       },
     });
