@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.janet.lexiai-local</string>
+  <!-- Serves the LOCAL build (dist/, built with GLOSS_LANG=zh from .env.local) at http://localhost:5181 -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/maoqing/.nvm/versions/node/v22.22.1/bin/node</string>
+    <string>/Users/maoqing/Desktop/Claude-cowork/lexiai/node_modules/vite/bin/vite.js</string>
+    <string>preview</string>
+    <string>--port</string>
+    <string>5181</string>
+    <string>--strictPort</string>
+    <string>--host</string>
+    <string>0.0.0.0</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/maoqing/Desktop/Claude-cowork/lexiai</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/Users/maoqing/.nvm/versions/node/v22.22.1/bin:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/tmp/lexiai-local.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/lexiai-local.log</string>
+</dict>
+</plist>
