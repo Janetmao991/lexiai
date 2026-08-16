@@ -1,6 +1,8 @@
 
 export interface DefinitionDetail {
   definition: string;
+  /** Optional native-language gloss of this sense; only produced when GLOSS_LANG is configured at build time. */
+  gloss?: string;
   synonyms: string[];
   examples: string[];
   collocations: string[];

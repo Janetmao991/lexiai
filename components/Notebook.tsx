@@ -306,7 +306,10 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onPractice,
                                             <p className={`font-serif text-2xl leading-tight font-bold tracking-tight text-stone-900`}>
                                                 {def.definition}
                                             </p>
-                                            
+                                            {def.gloss && (
+                                                <p className="text-lg leading-snug text-amber-700/90 -mt-2">{def.gloss}</p>
+                                            )}
+
                                             {def.synonyms && def.synonyms.length > 0 && (
                                                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
                                                   <div className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest mr-1 text-stone-400`}>

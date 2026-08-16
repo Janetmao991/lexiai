@@ -271,7 +271,10 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
                                 <p className={`text-2xl font-serif leading-tight font-bold tracking-tight text-stone-900`}>
                                   {d.definition}
                                 </p>
-                                
+                                {d.gloss && (
+                                  <p className="text-lg leading-snug text-amber-700/90 -mt-3">{d.gloss}</p>
+                                )}
+
                                 {d.synonyms && d.synonyms.length > 0 && (
                                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-2">
                                     <div className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest mr-1 text-stone-400`}>

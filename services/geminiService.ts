@@ -11,6 +11,15 @@ export const hasApiKey = (): boolean => Boolean(getApiKey());
 export const getTextModel = (): string =>
   (typeof localStorage !== 'undefined' && localStorage.getItem('lexiai_model')) || 'gemini-3-flash-preview';
 
+// Build-time gloss language (e.g. "zh"). Empty in the public build → no gloss.
+export const GLOSS_LANG: string = process.env.GLOSS_LANG || '';
+const GLOSS_LANG_NAMES: Record<string, string> = { zh: 'Simplified Chinese', ja: 'Japanese', ko: 'Korean', es: 'Spanish', fr: 'French', de: 'German' };
+const glossInstruction = (): string => {
+  if (!GLOSS_LANG) return '';
+  const name = GLOSS_LANG_NAMES[GLOSS_LANG] || GLOSS_LANG;
+  return `\n      5b. NATIVE GLOSS: For EVERY definition, fill "gloss" with a concise ${name} gloss of THAT specific sense (a few words; use standard ${name} finance/business terminology for finance senses). Never leave it empty.`;
+};
+
 const getAi = () => {
   const key = getApiKey();
   if (!key) throw new Error('No Gemini API key configured. Open Settings and paste your free key from aistudio.google.com/apikey.');
@@ -88,11 +97,12 @@ const dictionarySchema = {
               type: Type.OBJECT,
               properties: {
                 definition: { type: Type.STRING },
+                ...(GLOSS_LANG ? { gloss: { type: Type.STRING } } : {}),
                 synonyms: { type: Type.ARRAY, items: { type: Type.STRING } },
                 examples: { type: Type.ARRAY, items: { type: Type.STRING } },
                 collocations: { type: Type.ARRAY, items: { type: Type.STRING } },
               },
-              required: ["definition", "synonyms", "examples", "collocations"],
+              required: ["definition", ...(GLOSS_LANG ? ["gloss"] : []), "synonyms", "examples", "collocations"],
             },
           },
         },
@@ -340,7 +350,7 @@ export const lookupWord = async (word: string): Promise<WordEntry | null> => {
       2. If you correct it, set "wasCorrected" to true.
       3. Provide IPA, detailed meanings, and advanced usage examples.
       4. ESSENTIAL: Provide 4-6 natural collocations for each definition.
-      5. FINANCIAL FOCUS: If the word has a specific meaning in Finance, Business, or Economics, ENSURE you include that definition and set the partOfSpeech to exactly "Noun (Finance)", "Verb (Finance)", etc.
+      5. FINANCIAL FOCUS: If the word has a specific meaning in Finance, Business, or Economics, ENSURE you include that definition and set the partOfSpeech to exactly "Noun (Finance)", "Verb (Finance)", etc.${glossInstruction()}
       6. REVERSE LOOKUP: The input may be CHINESE (or an English description of a meaning) instead of an English word. In that case, pick the single closest English word/phrase as the headword and fill "candidates" with 2-3 OTHER English words that also express it, ordered closest-in-meaning first, each with a one-line "nuance" explaining when it fits better than the headword. For a normal English-word lookup, leave "candidates" as [].`,
       config: {
         thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
