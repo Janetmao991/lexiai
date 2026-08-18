@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { WordEntry, SynonymComparison, SentenceAnalysis } from '../types';
 import { lookupWord, playPronunciation, compareSynonyms, analyzeSentence } from '../services/geminiService';
+import { ipaLabel } from '../services/format';
 import { Search, Volume2, Save, Loader2, GitCompare, FileText, Sparkles, Check, Layers, Tag, TrendingUp } from 'lucide-react';
 import { DailyRead } from './DailyRead';
 
@@ -213,7 +214,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
                   <div>
                     <h1 className="text-6xl font-serif font-bold mb-5 tracking-tight capitalize text-stone-900">{lookupResult.word}</h1>
                     <div className="flex items-center gap-5">
-                      <span className="font-mono text-base text-stone-400 bg-stone-50 px-3 py-1 rounded-lg border border-stone-100">/{lookupResult.ipa || '---'}/</span>
+                      <span className="font-mono text-base text-stone-400 bg-stone-50 px-3 py-1 rounded-lg border border-stone-100">{ipaLabel(lookupResult.ipa, '/---/')}</span>
                       <button onClick={() => playPronunciation(lookupResult.word)} className="p-3 bg-stone-100 text-stone-900 rounded-full hover:bg-stone-900 hover:text-white transition-all hover:scale-110 shadow-sm">
                         <Volume2 className="w-5 h-5" />
                       </button>

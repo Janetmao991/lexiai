@@ -4,6 +4,7 @@ import { WordEntry, SrsRating } from '../types';
 import { srsService, MASTERY_META } from '../services/srsService';
 import { RotateCcw, ChevronLeft, ChevronRight, CheckCircle2, Layers, Gamepad2, CalendarClock, Keyboard, Volume2 } from 'lucide-react';
 import { playPronunciation } from '../services/geminiService';
+import { ipaLabel } from '../services/format';
 import { SynonymMatch } from './SynonymMatch';
 import { SpellingBee } from './SpellingBee';
 
@@ -215,7 +216,7 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
                   </h2>
                   <div className="flex items-center justify-center gap-3">
                     <span className="inline-block text-lg text-stone-400 font-mono">
-                      /{currentCard.ipa}/
+                      {ipaLabel(currentCard.ipa)}
                     </span>
                     <button
                       onClick={(e) => { e.stopPropagation(); playPronunciation(currentCard.word); }}
@@ -250,7 +251,7 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
                 </h2>
                 <div className="flex items-center justify-center gap-3">
                   <span className="inline-block text-lg text-stone-400 font-mono">
-                    /{currentCard.ipa}/
+                    {ipaLabel(currentCard.ipa)}
                   </span>
                   <button
                     onClick={(e) => { e.stopPropagation(); playPronunciation(currentCard.word); }}
