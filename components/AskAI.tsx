@@ -297,11 +297,15 @@ export const AskAI: React.FC<AskAIProps> = ({ onLookup }) => {
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
           onDrop={onDrop}
-          className="fixed bottom-24 md:bottom-6 right-4 md:right-6 z-50 w-[min(26rem,calc(100vw-2rem))] bg-white rounded-3xl shadow-2xl border border-stone-200 flex flex-col overflow-hidden animate-fade-in-up relative"
+          className="fixed bottom-24 md:bottom-6 right-4 md:right-6 z-50 w-[min(26rem,calc(100vw-2rem))] bg-white rounded-3xl shadow-2xl border border-stone-200 flex flex-col overflow-hidden animate-fade-in-up"
           style={{ maxHeight: `min(34rem, calc(70vh - ${kbOffset}px))`, transform: kbOffset ? `translateY(-${kbOffset}px)` : undefined, transition: 'transform 0.15s ease-out' }}
         >
-          {/* Drop target covering the whole panel — pointer-events off so the
-              drag keeps reaching the panel's own dragleave/drop handlers. */}
+          {/* Drop target covering the whole panel. The panel's own `fixed` is
+              already the containing block for this, so do NOT add `relative`
+              here: Tailwind emits .relative after .fixed, so it wins whatever
+              the class order, and the panel falls back into normal flow.
+              pointer-events off so the drag keeps reaching the panel's own
+              dragleave/drop handlers. */}
           {dragging && (
             <div className="absolute inset-2 z-20 rounded-[1.4rem] border-2 border-dashed border-stone-900 bg-stone-50/95 flex flex-col items-center justify-center gap-1.5 pointer-events-none">
               <Upload className="w-7 h-7 text-stone-900" />
