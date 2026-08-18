@@ -51,6 +51,10 @@ export interface WordEntry {
   originalQuery?: string;
   /** Reverse-lookup (e.g. Chinese → English): other candidate words, closest first. */
   candidates?: { word: string; nuance: string }[];
+  /** Near-miss forms easily confused with the headword — a different article, preposition or number
+   *  (e.g. "on margin" / "on the margins" vs "at the margin"). When the entry was normalized away from
+   *  what the user typed, the raw query is the first item. */
+  variants?: { form: string; note: string }[];
   srs?: SrsState;
   mastery?: MasteryState;
   // Sync metadata

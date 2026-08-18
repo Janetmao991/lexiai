@@ -132,6 +132,17 @@ const dictionarySchema = (withGloss: boolean) => ({
         required: ["word", "nuance"],
       },
     },
+    variants: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          form: { type: Type.STRING },
+          note: { type: Type.STRING },
+        },
+        required: ["form", "note"],
+      },
+    },
   },
   required: ["word", "ipa", "meanings"],
 });
@@ -322,21 +333,24 @@ const imageAnalysisSchema = {
   required: ["explanation", "breakdown", "words"],
 };
 
-/** Explain + break down the English text in a photo/screenshot, and pull out
-    the advanced vocabulary worth learning. */
-export const analyzeImageText = async (base64: string, mimeType: string): Promise<ImageTextAnalysis> => {
+/** Explain + break down the English text in an attachment — a photo, a screenshot,
+    a PDF, or a pasted text file — and pull out the advanced vocabulary worth learning.
+    `source` is the attachment part(s): an inline image/PDF, or the file's plain text. */
+export const analyzeSource = async (source: LexiPart[]): Promise<ImageTextAnalysis> => {
   const ai = getAi();
   const response = await generateWithRetry(ai, {
     model: getTextModel(),
     contents: [{ parts: [
-      { inlineData: { data: base64, mimeType } },
-      { text: `Read the English text in this image (a sentence, a paragraph, or a page). You are helping an advanced learner (C1, Chinese native, business/finance focus) truly understand it.
+      ...source,
+      { text: `Read the English text in the attachment above (a sentence, a paragraph, a page, or a whole document). You are helping an advanced learner (C1, Chinese native, business/finance focus) truly understand it.
 
 1. "explanation": restate what the text means in clear, plain English — 1-3 sentences. If it's a long passage, explain the core point. No markdown symbols.
 2. "breakdown": break down the key sentence(s) a C1 learner could stumble on — grammar structure, idioms, phrasal verbs, references, or logic. Each item ONE short line in the form "quoted part — what it does / how it works". 2-6 items; fewer if the text is simple.
 3. "words": the advanced words or phrases (C1+) most worth learning from this text — skip common words entirely. At most 10, most valuable first, each with a gloss of at most 8 words matching how it is used here.
 
-If the image contains no readable English text, set explanation to "I couldn't find readable English text in this image — try a clearer shot?", and leave breakdown and words empty.` },
+If it is a long document, cover its core argument in "explanation" and draw "breakdown" and "words" from the passages that matter most.
+
+If there is no readable English text, set explanation to "I couldn't find readable English text in that — try a clearer shot or another file?", and leave breakdown and words empty.` },
     ] }],
     config: {
       thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
@@ -364,7 +378,8 @@ export const lookupWord = async (word: string): Promise<WordEntry | null> => {
       3. Provide IPA, detailed meanings, and advanced usage examples.
       4. ESSENTIAL: Provide 4-6 natural collocations for each definition.
       5. FINANCIAL FOCUS: If the word has a specific meaning in Finance, Business, or Economics, ENSURE you include that definition and set the partOfSpeech to exactly "Noun (Finance)", "Verb (Finance)", etc.${glossInstruction(glossLang)}
-      6. REVERSE LOOKUP: The input may be CHINESE (or an English description of a meaning) instead of an English word. In that case, pick the single closest English word/phrase as the headword and fill "candidates" with 2-3 OTHER English words that also express it, ordered closest-in-meaning first, each with a one-line "nuance" explaining when it fits better than the headword. For a normal English-word lookup, leave "candidates" as [].`,
+      6. REVERSE LOOKUP: The input may be CHINESE (or an English description of a meaning) instead of an English word. In that case, pick the single closest English word/phrase as the headword and fill "candidates" with 2-3 OTHER English words that also express it, ordered closest-in-meaning first, each with a one-line "nuance" explaining when it fits better than the headword. For a normal English-word lookup, leave "candidates" as [].
+      7. VARIANT NOTES: Fill "variants" with the forms most easily confused with the headword — the same words with a different article, preposition, or number (e.g. for "at the margin": "on margin", "on the margins", "in the margin"). 2-4 items, each with "form" = the exact form and "note" = ONE line on how its meaning or register differs from the headword. Never repeat the headword itself, and never list a form that means exactly the same thing with no difference in register. If the input "${word}" is an English expression that you did NOT use verbatim as the headword, its own form MUST be the first item, saying plainly whether it is a true synonym, a looser or more colloquial variant, or a different expression altogether. If nothing is genuinely confusable, leave "variants" as [].`,
       config: {
         thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
         responseMimeType: "application/json",

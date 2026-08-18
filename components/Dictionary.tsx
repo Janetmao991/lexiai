@@ -14,6 +14,10 @@ interface DictionaryProps {
 
 type DictionaryMode = 'DEFINE' | 'COMPARE' | 'ANALYZE';
 
+/** Loose compare so "On The Margin " and "on the margin" don't read as a changed headword. */
+const normalizeForm = (s: string) =>
+  s.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[.!?,;:]+$/, '');
+
 export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, lookupRequest }) => {
   const [activeMode, setActiveMode] = useState<DictionaryMode>('DEFINE');
   const [loading, setLoading] = useState(false);
@@ -214,6 +218,14 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
                         <Volume2 className="w-5 h-5" />
                       </button>
                     </div>
+                    {/* The entry was normalized to a different headword — keep the query visible instead of swallowing it. */}
+                    {lookupResult.originalQuery
+                      && normalizeForm(lookupResult.originalQuery) !== normalizeForm(lookupResult.word)
+                      && !lookupResult.candidates?.length && (
+                      <p className="mt-5 text-sm text-stone-400">
+                        You searched <span className="font-serif italic text-stone-600">“{lookupResult.originalQuery}”</span> — shown under its standard headword.
+                      </p>
+                    )}
                   </div>
                   <button 
                     onClick={() => onSave(lookupResult)} 
@@ -243,6 +255,37 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
                         <span className="text-sm text-stone-500 ml-3">{c.nuance}</span>
                       </button>
                     ))}
+                  </div>
+                )}
+
+                {/* Easily-confused forms — same words with a different article, preposition or number */}
+                {lookupResult.variants && lookupResult.variants.length > 0 && (
+                  <div className="mb-12 p-6 bg-stone-50 rounded-2xl border border-stone-100 space-y-3">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-stone-400">Easily confused forms</p>
+                    {lookupResult.variants.map((v, vi) => {
+                      const isQuery = !!lookupResult.originalQuery
+                        && normalizeForm(v.form) === normalizeForm(lookupResult.originalQuery);
+                      // Looking the query form up again would just normalize back to this same entry.
+                      if (isQuery) {
+                        return (
+                          <div key={vi} className="w-full text-left p-3 rounded-xl bg-white border border-stone-200">
+                            <span className="font-serif font-bold text-lg text-stone-900">{v.form}</span>
+                            <span className="ml-3 text-[10px] font-bold uppercase tracking-[0.2em] text-stone-400 align-middle">you searched</span>
+                            <span className="text-sm text-stone-500 ml-3">{v.note}</span>
+                          </div>
+                        );
+                      }
+                      return (
+                        <button
+                          key={vi}
+                          onClick={() => doLookup(v.form)}
+                          className="w-full text-left p-3 rounded-xl hover:bg-white hover:shadow-sm border border-transparent hover:border-stone-200 transition-all group"
+                        >
+                          <span className="font-serif font-bold text-lg text-stone-900 group-hover:underline underline-offset-4">{v.form}</span>
+                          <span className="text-sm text-stone-500 ml-3">{v.note}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
 
