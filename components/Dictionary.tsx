@@ -44,7 +44,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
     setError('');
   };
 
-  const doLookup = async (word: string) => {
+  const doLookup = async (word: string, exact = false) => {
     if (!word.trim()) return;
     setActiveMode('DEFINE');
     setQuery(word);
@@ -54,7 +54,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
     setCompareResult(null);
     setAnalyzeResult(null);
     try {
-      const data = await lookupWord(word);
+      const data = await lookupWord(word, { exact });
       if (data) setLookupResult(data);
       else setError('No results found.');
     } catch (err: any) {
@@ -225,6 +225,14 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
                       && !lookupResult.candidates?.length && (
                       <p className="mt-5 text-sm text-stone-400">
                         You searched <span className="font-serif italic text-stone-600">“{lookupResult.originalQuery}”</span> — shown under its standard headword.
+                        {/* The correction is a judgement call and it can be wrong — jargon
+                            like "lead left" is real. Always leave a way back. */}
+                        <button
+                          onClick={() => doLookup(lookupResult.originalQuery!, true)}
+                          className="ml-2 text-stone-500 underline underline-offset-4 hover:text-stone-900"
+                        >
+                          Look it up as typed
+                        </button>
                       </p>
                     )}
                   </div>

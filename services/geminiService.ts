@@ -11,8 +11,10 @@ export const hasApiKey = (): boolean => Boolean(getApiKey());
 export const getTextModel = (): string =>
   (typeof localStorage !== 'undefined' && localStorage.getItem('lexiai_model')) || 'gemini-3-flash-preview';
 
-// User-selectable gloss language (Settings → "Definition gloss"). Stored per
-// browser; empty/absent = English-only definitions (the default).
+// User-selectable gloss language (Settings → "Definition gloss"). Mirrored in
+// localStorage for synchronous reads; the source of truth syncs through
+// statsService (user_stats.prefs) so every signed-in device agrees.
+// Empty/absent = English-only definitions (the default).
 export const GLOSS_STORAGE = 'lexiai_gloss_lang';
 export const GLOSS_LANGS: { id: string; label: string; name: string }[] = [
   { id: '',   label: 'Off',       name: '' },
@@ -363,7 +365,8 @@ If there is no readable English text, set explanation to "I couldn't find readab
   return parsed || { explanation: 'Hmm, no answer came back — try again?', breakdown: [], words: [] };
 };
 
-export const lookupWord = async (word: string): Promise<WordEntry | null> => {
+/** `opts.exact` — the learner insists on their own wording; never substitute a headword. */
+export const lookupWord = async (word: string, opts?: { exact?: boolean }): Promise<WordEntry | null> => {
   const ai = getAi();
   const glossLang = getGlossLang();
   try {
@@ -373,8 +376,9 @@ export const lookupWord = async (word: string): Promise<WordEntry | null> => {
       
       CRITICAL ACCURACY CHECK:
       The user input is: "${word}".
-      1. If this is a malapropism or a non-standard expression, correct it to the standard idiomatic version.
-      2. If you correct it, set "wasCorrected" to true.
+      1. Correct the input ONLY when it is a genuine error: a misspelling, or a malapropism ("for all intensive purposes" → "for all intents and purposes"). A term that is actually used in finance, business or tech is NOT an error however unusual it looks — keep it EXACTLY as typed, word order included. "lead left" is a real syndicate/IPO term and must never be turned into "left lead". Never reorder, re-hyphenate or otherwise tidy a phrase just to make it look more familiar, and when you are unsure whether a form is attested, keep the learner's form as the headword and explain its status in the definition.
+      2. If you correct it, set "wasCorrected" to true.${opts?.exact ? `
+      OVERRIDE — the learner has already been shown a different headword and has asked for "${word}" exactly as typed: use it verbatim as the headword, set "wasCorrected" to false, and if it is rare, informal or non-standard, say so inside the first definition instead of substituting another form.` : ''}
       3. Provide IPA, detailed meanings, and advanced usage examples.
       4. ESSENTIAL: Provide 4-6 natural collocations for each definition.
       5. FINANCIAL FOCUS: If the word has a specific meaning in Finance, Business, or Economics, ENSURE you include that definition and set the partOfSpeech to exactly "Noun (Finance)", "Verb (Finance)", etc.${glossInstruction(glossLang)}
