@@ -1,6 +1,7 @@
-import { UserStats, DailyProgress, WordEntry } from '../types';
+import { UserStats, DailyProgress, WordEntry, UserPrefs } from '../types';
 import { srsService, todayStr, daysFromToday } from './srsService';
 import { supabase } from './supabaseClient';
+import { GLOSS_STORAGE } from './geminiService';
 
 const STATS_KEY = 'lexiai_stats_v1';
 
@@ -134,8 +135,40 @@ const touchStreak = (stats: UserStats) => {
   stats.lastActiveDate = today;
 };
 
+/** Mirror the chosen gloss language into localStorage, where geminiService reads it synchronously. */
+const applyPrefsLocally = (prefs?: UserPrefs) => {
+  if (!prefs) return;
+  if (prefs.glossLang) localStorage.setItem(GLOSS_STORAGE, prefs.glossLang);
+  else localStorage.removeItem(GLOSS_STORAGE);
+};
+
+/**
+ * Pick the prefs that were changed most recently. A browser that chose a gloss
+ * language before prefs existed in the cloud (localStorage only) counts as
+ * "set now", so its choice is carried up on the next sync.
+ */
+const newerPrefs = (local: UserStats, remote: UserStats | null): UserPrefs | undefined => {
+  let l = local.prefs;
+  if (!l) {
+    const legacy = localStorage.getItem(GLOSS_STORAGE);
+    if (legacy) l = { glossLang: legacy, updatedAt: new Date().toISOString() };
+  }
+  const r = remote?.prefs;
+  if (!l) return r;
+  if (!r) return l;
+  return (r.updatedAt || '') > (l.updatedAt || '') ? r : l;
+};
+
 export const statsService = {
   get: (): UserStats => load(),
+
+  /** Settings → Definition gloss. Saved locally at once and synced to every signed-in device. */
+  setGlossLang: (lang: string) => {
+    const stats = load();
+    stats.prefs = { ...(stats.prefs || {}), glossLang: lang || '', updatedAt: new Date().toISOString() };
+    applyPrefsLocally(stats.prefs);
+    persist(stats);
+  },
 
   /**
    * Showing up counts: opening the app marks today active so the day-streak
@@ -182,6 +215,10 @@ export const statsService = {
       const remote: UserStats | null = data?.data ? { ...defaultStats(), ...data.data } : null;
       const winner = remote && remote.xp > local.xp ? remote : local;
       if (winner.daily.date !== todayStr()) winner.daily = emptyDaily();
+      // Preferences merge independently of the XP winner: the most recent choice wins.
+      const prefs = newerPrefs(local, remote);
+      if (prefs) winner.prefs = prefs;
+      applyPrefsLocally(winner.prefs);
       persist(winner);
     } catch (e) {
       console.warn('[STATS] cloud sync failed', e);

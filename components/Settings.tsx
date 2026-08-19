@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { X, KeyRound, Eye, EyeOff, Check, ExternalLink, Languages } from 'lucide-react';
 import { GLOSS_STORAGE, GLOSS_LANGS } from '../services/geminiService';
+import { statsService } from '../services/statsService';
 
 interface SettingsProps {
   onClose: () => void;
@@ -28,8 +29,7 @@ export const Settings: React.FC<SettingsProps> = ({ onClose }) => {
     if (apiKey.trim()) localStorage.setItem(KEY_STORAGE, apiKey.trim());
     else localStorage.removeItem(KEY_STORAGE);
     localStorage.setItem(MODEL_STORAGE, model);
-    if (gloss) localStorage.setItem(GLOSS_STORAGE, gloss);
-    else localStorage.removeItem(GLOSS_STORAGE);
+    statsService.setGlossLang(gloss); // local + cloud, so phone and desktop agree
     setSaved(true);
     setTimeout(onClose, 700);
   };
@@ -103,7 +103,7 @@ export const Settings: React.FC<SettingsProps> = ({ onClose }) => {
             ))}
           </div>
           <p className="text-xs text-stone-400 leading-relaxed">
-            Adds a short native-language gloss under each English definition. Off keeps definitions English-only.
+            Adds a short native-language gloss under each English definition. Off keeps definitions English-only. Synced to all your signed-in devices.
           </p>
         </div>
 

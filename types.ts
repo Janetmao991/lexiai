@@ -1,7 +1,7 @@
 
 export interface DefinitionDetail {
   definition: string;
-  /** Optional native-language gloss of this sense; only produced when GLOSS_LANG is configured at build time. */
+  /** Optional native-language gloss of this sense; only produced when a gloss language is chosen in Settings. */
   gloss?: string;
   synonyms: string[];
   examples: string[];
@@ -82,6 +82,15 @@ export interface UserStats {
   achievements: Record<string, string>; // id -> unlock ISO date
   totals: { reviews: number; practices: number; podcasts: number; speaking: number };
   daily: DailyProgress;
+  /** Cross-device preferences that ride along in the same cloud blob (API key is NOT one of them). */
+  prefs?: UserPrefs;
+}
+
+export interface UserPrefs {
+  /** Settings → Definition gloss. '' / undefined = English-only. */
+  glossLang?: string;
+  /** ISO timestamp of the last change; newer wins when devices disagree. */
+  updatedAt?: string;
 }
 
 export interface PracticeFeedback {
