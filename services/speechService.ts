@@ -20,7 +20,7 @@ export interface RecordingHandle {
   cancel: () => void;
 }
 
-const recordViaWebSpeech = (): RecordingHandle => {
+const recordViaWebSpeech = async (): Promise<RecordingHandle> => {
   const recognition = new SpeechRecognitionImpl();
   recognition.lang = 'en-US';
   recognition.continuous = true;
@@ -57,7 +57,13 @@ const recordViaWebSpeech = (): RecordingHandle => {
     settled = true;
     resolveStop(transcript.trim());
   };
-  recognition.start();
+  // Resolve once recognition is actually listening (1.5s fallback so a
+  // missing onstart event can never hang the UI in the 'starting' state).
+  await new Promise<void>(resolve => {
+    recognition.onstart = () => resolve();
+    setTimeout(resolve, 1500);
+    recognition.start();
+  });
 
   return {
     stop: () => { stopping = true; recognition.stop(); return done; },
@@ -88,9 +94,14 @@ const recordViaMediaRecorder = async (): Promise<RecordingHandle> => {
   const mimeType = pickMimeType();
   const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
   const chunks: Blob[] = [];
-  const startedAt = Date.now();
   recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-  recorder.start();
+  // Don't hand the caller a handle until capture has genuinely begun —
+  // otherwise the UI says "Listening" while the first word goes unrecorded.
+  await new Promise<void>(resolve => {
+    recorder.onstart = () => resolve();
+    recorder.start();
+  });
+  const startedAt = Date.now();
 
   const cleanup = () => stream.getTracks().forEach(t => t.stop());
 

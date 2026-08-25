@@ -24,7 +24,7 @@ interface SpeakingProps {
   onExerciseDone: (word: WordEntry, kind: SpeakingKind, passed: boolean) => void;
 }
 
-type RecState = 'idle' | 'recording' | 'processing';
+type RecState = 'idle' | 'starting' | 'recording' | 'processing';
 
 const pickRandom = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
@@ -71,12 +71,16 @@ export const Speaking: React.FC<SpeakingProps> = ({ words, onExerciseDone }) => 
     setError(null);
     const gen = recGen.current;
     try {
-      setRecState('recording');
+      // 'starting' until the mic is genuinely capturing — flipping straight to
+      // "Listening" made people speak into the ~0.5s device-open gap, so short
+      // answers (Recall's single word) arrived as silence.
+      setRecState('starting');
       const handle = await speechService.startRecording();
       if (gen !== recGen.current) { handle.cancel(); return; }
       recordingRef.current = handle;
       // store the consumer for stop
       (handle as any)._consume = onTranscript;
+      setRecState('recording');
     } catch (e: any) {
       setRecState('idle');
       setError(friendlyError(String(e?.message || 'Could not access the microphone.')));
@@ -112,15 +116,15 @@ export const Speaking: React.FC<SpeakingProps> = ({ words, onExerciseDone }) => 
       ) : (
         <button
           onClick={() => { onStart?.(); startRecording(onTranscript); }}
-          disabled={disabled || recState === 'processing'}
+          disabled={disabled || recState === 'processing' || recState === 'starting'}
           className="w-20 h-20 rounded-full bg-stone-900 text-white flex items-center justify-center shadow-xl hover:bg-black disabled:opacity-40 transition-all"
           title="Start recording"
         >
-          {recState === 'processing' ? <Loader2 className="w-7 h-7 animate-spin" /> : <Mic className="w-7 h-7" />}
+          {recState === 'processing' || recState === 'starting' ? <Loader2 className="w-7 h-7 animate-spin" /> : <Mic className="w-7 h-7" />}
         </button>
       )}
       <p className="text-xs text-stone-400 uppercase tracking-widest font-semibold">
-        {recState === 'recording' ? 'Listening… tap to stop' : recState === 'processing' ? 'Transcribing…' : 'Tap to speak'}
+        {recState === 'recording' ? 'Listening… speak now' : recState === 'starting' ? 'Opening mic…' : recState === 'processing' ? 'Transcribing…' : 'Tap to speak'}
       </p>
     </div>
   );
