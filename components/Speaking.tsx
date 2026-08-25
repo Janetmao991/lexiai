@@ -99,7 +99,7 @@ export const Speaking: React.FC<SpeakingProps> = ({ words, onExerciseDone }) => 
     }
   };
 
-  const RecordButton: React.FC<{ onTranscript: (t: string) => void; disabled?: boolean }> = ({ onTranscript, disabled }) => (
+  const RecordButton: React.FC<{ onTranscript: (t: string) => void; onStart?: () => void; disabled?: boolean }> = ({ onTranscript, onStart, disabled }) => (
     <div className="flex flex-col items-center gap-3">
       {recState === 'recording' ? (
         <button
@@ -111,7 +111,7 @@ export const Speaking: React.FC<SpeakingProps> = ({ words, onExerciseDone }) => 
         </button>
       ) : (
         <button
-          onClick={() => startRecording(onTranscript)}
+          onClick={() => { onStart?.(); startRecording(onTranscript); }}
           disabled={disabled || recState === 'processing'}
           className="w-20 h-20 rounded-full bg-stone-900 text-white flex items-center justify-center shadow-xl hover:bg-black disabled:opacity-40 transition-all"
           title="Start recording"
@@ -175,7 +175,7 @@ export const Speaking: React.FC<SpeakingProps> = ({ words, onExerciseDone }) => 
           </div>
 
           <div className="flex justify-center">
-            <RecordButton onTranscript={(t) => {
+            <RecordButton onStart={() => setRecallResult(null)} onTranscript={(t) => {
               const correct = containsWord(t, recallWord.word);
               setRecallResult({ transcript: t, correct });
               onExerciseDone(recallWord, 'recall', correct);
@@ -229,7 +229,7 @@ export const Speaking: React.FC<SpeakingProps> = ({ words, onExerciseDone }) => 
             </div>
 
             <div className="flex justify-center">
-              <RecordButton onTranscript={(t) => { setTranscript(t); setFeedback(null); }} />
+              <RecordButton onStart={() => { setTranscript(null); setFeedback(null); }} onTranscript={(t) => { setTranscript(t); setFeedback(null); }} />
             </div>
 
             {transcript && (
@@ -319,7 +319,7 @@ export const Speaking: React.FC<SpeakingProps> = ({ words, onExerciseDone }) => 
             </div>
 
             <div className="flex justify-center">
-              <RecordButton onTranscript={(t) => { setNativeTranscript(t); setNativeResult(null); }} />
+              <RecordButton onStart={() => { setNativeTranscript(null); setNativeResult(null); }} onTranscript={(t) => { setNativeTranscript(t); setNativeResult(null); }} />
             </div>
 
             {nativeTranscript && (

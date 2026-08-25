@@ -66,7 +66,7 @@ const recordViaWebSpeech = (): RecordingHandle => {
 };
 
 const pickMimeType = (): string => {
-  const candidates = ['audio/webm', 'audio/mp4', 'audio/ogg'];
+  const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
   for (const t of candidates) {
     if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(t)) return t;
   }
@@ -82,7 +82,9 @@ const blobToBase64 = (blob: Blob): Promise<string> =>
   });
 
 const recordViaMediaRecorder = async (): Promise<RecordingHandle> => {
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: true, noiseSuppression: true },
+  });
   const mimeType = pickMimeType();
   const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
   const chunks: Blob[] = [];
@@ -99,9 +101,10 @@ const recordViaMediaRecorder = async (): Promise<RecordingHandle> => {
           cleanup();
           try {
             const blob = new Blob(chunks, { type: recorder.mimeType });
-            if (blob.size < 1000) throw new Error('Recording too short. Please try again.');
+            if (blob.size < 1500) throw new Error('Recording too short. Please try again.');
             const base64 = await blobToBase64(blob);
-            const text = await transcribeAudio(base64, recorder.mimeType);
+            // Gemini wants a bare mime type — strip any ';codecs=…' suffix.
+            const text = await transcribeAudio(base64, recorder.mimeType.split(';')[0]);
             // Hallucination guard: the audio model sometimes invents a whole
             // monologue for a near-silent clip. Nobody speaks 4+ words/second,
             // so a transcript far longer than the clip allows is fabricated.
