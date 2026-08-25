@@ -43,7 +43,7 @@ const getAi = () => {
 
 // Free-tier Gemini throws transient 503/429 blips; retry those quietly before
 // surfacing an error to the UI.
-const TRANSIENT = /503|UNAVAILABLE|overloaded|high demand|fetch failed|network/i;
+const TRANSIENT = /503|504|UNAVAILABLE|DEADLINE_EXCEEDED|Deadline expired|overloaded|high demand|fetch failed|network/i;
 const generateWithRetry = async (ai: GoogleGenAI, params: GenerateContentParameters, tries = 3): Promise<GenerateContentResponse> => {
   let lastError: unknown;
   for (let attempt = 0; attempt < tries; attempt++) {
@@ -61,6 +61,15 @@ const generateWithRetry = async (ai: GoogleGenAI, params: GenerateContentParamet
   throw lastError;
 };
 
+
+/** Turn a raw API error into something a learner can act on. */
+export const friendlyError = (raw: string): string => {
+  if (/504|DEADLINE_EXCEEDED|Deadline expired|timed? ?out/i.test(raw)) return 'That took too long and timed out — please try again.';
+  if (/503|UNAVAILABLE|overloaded|high demand/i.test(raw)) return 'The AI service is briefly overloaded — wait a few seconds and try again.';
+  if (/429|RESOURCE_EXHAUSTED|quota/i.test(raw)) return 'Rate limit reached — take a short break and try again in a minute.';
+  if (/API key/i.test(raw)) return raw;
+  return raw.length > 140 || raw.includes('{"') ? 'Something went wrong talking to the AI. Please try again.' : raw;
+};
 
 // Helper functions for audio decoding based on @google/genai guidelines
 function decode(base64: string) {

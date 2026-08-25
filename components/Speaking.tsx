@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { WordEntry } from '../types';
 import { speechService, diffTranscript, containsWord, ShadowDiff, RecordingHandle } from '../services/speechService';
-import { checkSentence, rephraseNatively } from '../services/geminiService';
+import { checkSentence, rephraseNatively, friendlyError } from '../services/geminiService';
 import { PracticeFeedback, NativeRephrase } from '../types';
 import { Mic, Square, Volume2, ArrowRight, Loader2, CheckCircle2, XCircle, Ear, MessageCircle, Lightbulb, Award, AlertCircle, Sparkles, RefreshCw } from 'lucide-react';
 
@@ -88,7 +88,7 @@ export const Speaking: React.FC<SpeakingProps> = ({ words, onExerciseDone }) => 
       (handle as any)._consume = onTranscript;
     } catch (e: any) {
       setRecState('idle');
-      setError(e.message || 'Could not access the microphone.');
+      setError(friendlyError(String(e?.message || 'Could not access the microphone.')));
     }
   };
 
@@ -101,7 +101,7 @@ export const Speaking: React.FC<SpeakingProps> = ({ words, onExerciseDone }) => 
       if (!text) throw new Error("Didn't catch that — please try speaking again, a bit louder.");
       ((handle as any)._consume as (t: string) => void)(text);
     } catch (e: any) {
-      setError(e.message || 'Transcription failed.');
+      setError(friendlyError(String(e?.message || 'Transcription failed.')));
     } finally {
       setRecState('idle');
       recordingRef.current = null;
@@ -320,7 +320,7 @@ export const Speaking: React.FC<SpeakingProps> = ({ words, onExerciseDone }) => 
                           onExerciseDone(sentenceWord, 'sentence', result.score >= 80);
                         }
                       } catch (e: any) {
-                        setError(e.message || 'Feedback failed — try again.');
+                        setError(friendlyError(String(e?.message || 'Feedback failed — try again.')));
                       } finally {
                         setChecking(false);
                       }
@@ -407,7 +407,7 @@ export const Speaking: React.FC<SpeakingProps> = ({ words, onExerciseDone }) => 
                         const result = await rephraseNatively(nativeTranscript);
                         if (result) setNativeResult(result);
                       } catch (e: any) {
-                        setError(e.message || 'Rephrase failed — try again.');
+                        setError(friendlyError(String(e?.message || 'Rephrase failed — try again.')));
                       } finally {
                         setNativeChecking(false);
                       }
