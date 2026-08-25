@@ -1,7 +1,9 @@
 // Speech capture with two strategies:
-// 1. Web Speech API (Chrome/Edge): instant, free, streaming.
-// 2. MediaRecorder -> Gemini audio transcription (Safari/iOS fallback).
-import { transcribeAudio } from './geminiService';
+// 1. MediaRecorder -> Gemini audio transcription: reliable, no silence timeout —
+//    preferred whenever an API key is configured (same pipeline as LexiSpeak).
+// 2. Web Speech API (Chrome/Edge): free, key-less fallback; Chrome aborts it
+//    with `no-speech` after a few silent seconds, so we auto-restart on that.
+import { transcribeAudio, hasApiKey, speakNatural, stopNaturalSpeech } from './geminiService';
 
 export type SttStrategy = 'web-speech' | 'gemini-audio';
 
@@ -10,7 +12,8 @@ const SpeechRecognitionImpl: any =
     ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     : null;
 
-export const sttStrategy: SttStrategy = SpeechRecognitionImpl ? 'web-speech' : 'gemini-audio';
+export const sttStrategy = (): SttStrategy =>
+  (hasApiKey() || !SpeechRecognitionImpl) ? 'gemini-audio' : 'web-speech';
 
 export interface RecordingHandle {
   stop: () => Promise<string>; // resolves with the final transcript
@@ -25,6 +28,7 @@ const recordViaWebSpeech = (): RecordingHandle => {
 
   let transcript = '';
   let settled = false;
+  let stopping = false;
   let resolveStop: (t: string) => void;
   let rejectStop: (e: Error) => void;
   const done = new Promise<string>((res, rej) => { resolveStop = res; rejectStop = rej; });
@@ -36,6 +40,8 @@ const recordViaWebSpeech = (): RecordingHandle => {
   };
   recognition.onerror = (event: any) => {
     if (settled) return;
+    // `no-speech` is Chrome's silence timeout, not a failure — onend restarts us.
+    if (event.error === 'no-speech') return;
     settled = true;
     rejectStop(new Error(event.error === 'not-allowed'
       ? 'Microphone access denied. Please allow the microphone and try again.'
@@ -43,13 +49,18 @@ const recordViaWebSpeech = (): RecordingHandle => {
   };
   recognition.onend = () => {
     if (settled) return;
+    if (!stopping) {
+      // Keep listening across Chrome's silence timeouts until the user taps stop.
+      try { recognition.start(); } catch { /* already running */ }
+      return;
+    }
     settled = true;
     resolveStop(transcript.trim());
   };
   recognition.start();
 
   return {
-    stop: () => { recognition.stop(); return done; },
+    stop: () => { stopping = true; recognition.stop(); return done; },
     cancel: () => { settled = true; recognition.abort(); },
   };
 };
@@ -105,13 +116,17 @@ export const speechService = {
 
   /** Start capturing speech. Call .stop() on the handle to get the transcript. */
   startRecording: async (): Promise<RecordingHandle> => {
-    if (sttStrategy === 'web-speech') return recordViaWebSpeech();
+    if (sttStrategy() === 'web-speech') return recordViaWebSpeech();
     return recordViaMediaRecorder();
   },
 
-  /** Speak text with the browser's TTS. Resolves when playback ends. */
-  speak: (text: string, rate = 0.92): Promise<void> =>
-    new Promise(resolve => {
+  /** Speak text — Gemini's natural voice when a key is configured, otherwise
+      (or on any TTS failure) the browser voice. Resolves when playback ends. */
+  speak: async (text: string, rate = 0.92): Promise<void> => {
+    if (hasApiKey()) {
+      try { await speakNatural(text); return; } catch { /* fall back to the browser voice */ }
+    }
+    return new Promise(resolve => {
       if (!('speechSynthesis' in window)) return resolve();
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
@@ -123,9 +138,11 @@ export const speechService = {
       utterance.onend = () => resolve();
       utterance.onerror = () => resolve();
       window.speechSynthesis.speak(utterance);
-    }),
+    });
+  },
 
   stopSpeaking: () => {
+    stopNaturalSpeech();
     if ('speechSynthesis' in window) window.speechSynthesis.cancel();
   },
 };

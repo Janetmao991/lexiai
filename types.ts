@@ -102,6 +102,26 @@ export interface PracticeFeedback {
   suggestions: string[];
 }
 
+export interface NativeRephraseNote {
+  /** What the learner actually said (the non-native bit). */
+  yours: string;
+  /** The natural native phrasing for that bit. */
+  native: string;
+  /** One-line reason: collocation, register, word choice, structure… */
+  why: string;
+}
+
+export interface NativeRephrase {
+  /** 0–100: how natural the original already sounded. */
+  naturalness: number;
+  /** The same message the way a native speaker would say it out loud. */
+  nativeVersion: string;
+  /** A polished, professional-register variant (meetings, interviews). */
+  formalVersion: string;
+  /** Up to 4 point-by-point fixes; empty when already native. */
+  notes: NativeRephraseNote[];
+}
+
 export interface ArticleEntry {
   id: string;
   title: string;

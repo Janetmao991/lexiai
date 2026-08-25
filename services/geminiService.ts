@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type, Modality, ThinkingLevel, GenerateContentParameters, GenerateContentResponse } from "@google/genai";
-import { WordEntry, PracticeFeedback, ContextExplanation, PodcastScript, SynonymComparison, SentenceAnalysis } from "../types";
+import { WordEntry, PracticeFeedback, NativeRephrase, ContextExplanation, PodcastScript, SynonymComparison, SentenceAnalysis } from "../types";
 
 // ---- BYOK: the Gemini key lives in this browser only ----
 export const getApiKey = (): string =>
@@ -431,6 +431,58 @@ export const checkSentence = async (word: string, sentence: string): Promise<Pra
   }
 };
 
+const nativeRephraseSchema = {
+  type: Type.OBJECT,
+  properties: {
+    naturalness: { type: Type.NUMBER },
+    nativeVersion: { type: Type.STRING },
+    formalVersion: { type: Type.STRING },
+    notes: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          yours: { type: Type.STRING },
+          native: { type: Type.STRING },
+          why: { type: Type.STRING },
+        },
+        required: ["yours", "native", "why"],
+      },
+    },
+  },
+  required: ["naturalness", "nativeVersion", "formalVersion", "notes"],
+};
+
+export const rephraseNatively = async (text: string): Promise<NativeRephrase | null> => {
+  const ai = getAi();
+  try {
+    const response = await generateWithRetry(ai, {
+      model: getTextModel(),
+      contents: `You are a native American English speech coach for an advanced ESL learner (business school student, AI/finance career).
+
+THE LEARNER SAID (transcribed speech): "${text}"
+
+Rewrite what they said the way a native speaker would ACTUALLY SAY IT OUT LOUD — same meaning, same information, natural spoken register (contractions, natural connectors, idiomatic collocations). Do not add new content or make it longer than it needs to be.
+
+Return:
+1. naturalness — 0-100 for how native the original already sounds (90+ = essentially native; below 60 = clearly translated-sounding).
+2. nativeVersion — the everyday conversational way to say it.
+3. formalVersion — a polished professional-register version (meeting/interview appropriate), still spoken language, not written prose.
+4. notes — up to 4 point fixes for the MOST non-native bits only: quote the learner's exact phrase (yours), the native phrasing (native), and a short reason (why: wrong collocation / too formal / word-for-word translation / unnatural structure…). If the original is already natural, return fewer notes or none — never invent problems.`,
+      config: {
+        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
+        responseMimeType: "application/json",
+        responseSchema: nativeRephraseSchema,
+        temperature: 0.4,
+      },
+    });
+    return response.text ? JSON.parse(response.text) : null;
+  } catch (error) {
+    console.error("Error rephrasing natively:", error);
+    throw error;
+  }
+};
+
 export const analyzeContextFromText = async (word: string, fullText: string): Promise<ContextExplanation | null> => {
   const ai = getAi();
   try {
@@ -449,6 +501,47 @@ export const analyzeContextFromText = async (word: string, fullText: string): Pr
     console.error("Error analyzing context from text:", error);
     throw error;
   }
+};
+
+// One active Gemini-TTS playback at a time; stopNaturalSpeech cancels it.
+let activeTts: { ctx: AudioContext; source: AudioBufferSourceNode } | null = null;
+export const stopNaturalSpeech = () => {
+  if (activeTts) {
+    try { activeTts.source.stop(); activeTts.ctx.close(); } catch { /* already stopped */ }
+    activeTts = null;
+  }
+};
+
+/** Natural-sounding TTS for sentences (Gemini voice). Throws when unavailable —
+    callers fall back to the browser voice. Resolves when playback ends. */
+export const speakNatural = async (text: string): Promise<void> => {
+  const ai = getAi();
+  const response = await generateWithRetry(ai, {
+    model: "gemini-2.5-flash-preview-tts",
+    contents: [{ parts: [{ text: `Say this warmly and conversationally, like natural speech: ${text}` }] }],
+    config: {
+      responseModalities: [Modality.AUDIO],
+      speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
+    },
+  });
+  const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+  if (!base64Audio) throw new Error("No audio content returned");
+  const AudioContextClass = (window as any).AudioContext || (window as any).webkitAudioContext;
+  if (!AudioContextClass) return;
+  stopNaturalSpeech();
+  const ctx = new AudioContextClass({ sampleRate: 24000 });
+  const buffer = await decodeAudioData(decode(base64Audio), ctx, 24000, 1);
+  await new Promise<void>(resolve => {
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(ctx.destination);
+    activeTts = { ctx, source };
+    source.onended = () => {
+      if (activeTts?.source === source) { try { ctx.close(); } catch { /* noop */ } activeTts = null; }
+      resolve();
+    };
+    source.start();
+  });
 };
 
 export const playPronunciation = async (word: string): Promise<void> => {
