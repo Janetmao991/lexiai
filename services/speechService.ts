@@ -86,6 +86,7 @@ const recordViaMediaRecorder = async (): Promise<RecordingHandle> => {
   const mimeType = pickMimeType();
   const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
   const chunks: Blob[] = [];
+  const startedAt = Date.now();
   recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
   recorder.start();
 
@@ -100,7 +101,16 @@ const recordViaMediaRecorder = async (): Promise<RecordingHandle> => {
             const blob = new Blob(chunks, { type: recorder.mimeType });
             if (blob.size < 1000) throw new Error('Recording too short. Please try again.');
             const base64 = await blobToBase64(blob);
-            resolve(await transcribeAudio(base64, recorder.mimeType));
+            const text = await transcribeAudio(base64, recorder.mimeType);
+            // Hallucination guard: the audio model sometimes invents a whole
+            // monologue for a near-silent clip. Nobody speaks 4+ words/second,
+            // so a transcript far longer than the clip allows is fabricated.
+            const seconds = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
+            const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+            if (words > Math.max(8, seconds * 4)) {
+              throw new Error("Didn't catch that clearly — please tap the mic and try again.");
+            }
+            resolve(text);
           } catch (e) {
             reject(e);
           }
