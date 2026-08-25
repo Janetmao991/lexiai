@@ -1,12 +1,12 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { WordEntry } from '../types';
-import { speechService, diffTranscript, containsWord, ShadowDiff, RecordingHandle } from '../services/speechService';
+import { speechService, containsWord, RecordingHandle } from '../services/speechService';
 import { checkSentence, rephraseNatively, friendlyError } from '../services/geminiService';
 import { PracticeFeedback, NativeRephrase } from '../types';
-import { Mic, Square, Volume2, ArrowRight, Loader2, CheckCircle2, XCircle, Ear, MessageCircle, Lightbulb, Award, AlertCircle, Sparkles, RefreshCw } from 'lucide-react';
+import { Mic, Square, Volume2, ArrowRight, Loader2, CheckCircle2, XCircle, MessageCircle, Lightbulb, Award, AlertCircle, Sparkles, RefreshCw } from 'lucide-react';
 
-export type SpeakingKind = 'shadow' | 'recall' | 'sentence' | 'native';
+export type SpeakingKind = 'recall' | 'sentence' | 'native';
 
 const NATIVE_TOPICS = [
   'Describe what you worked on today.',
@@ -28,21 +28,15 @@ type RecState = 'idle' | 'recording' | 'processing';
 
 const pickRandom = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
-const wordsWithExamples = (words: WordEntry[]) =>
-  words.filter(w => w.meanings?.[0]?.definitions?.[0]?.examples?.length);
-
-const exampleOf = (w: WordEntry): string => w.meanings[0].definitions[0].examples[0];
 const definitionOf = (w: WordEntry): string => w.meanings[0]?.definitions[0]?.definition || '';
 
 export const Speaking: React.FC<SpeakingProps> = ({ words, onExerciseDone }) => {
-  const [mode, setMode] = useState<SpeakingKind>('shadow');
+  const [mode, setMode] = useState<SpeakingKind>('recall');
   const [recState, setRecState] = useState<RecState>('idle');
   const [error, setError] = useState<string | null>(null);
   const recordingRef = useRef<RecordingHandle | null>(null);
 
   // Per-mode current word + results
-  const [shadowWord, setShadowWord] = useState<WordEntry | null>(null);
-  const [shadowDiff, setShadowDiff] = useState<ShadowDiff | null>(null);
   const [recallWord, setRecallWord] = useState<WordEntry | null>(null);
   const [recallResult, setRecallResult] = useState<{ transcript: string; correct: boolean } | null>(null);
   const [sentenceWord, setSentenceWord] = useState<WordEntry | null>(null);
@@ -54,13 +48,10 @@ export const Speaking: React.FC<SpeakingProps> = ({ words, onExerciseDone }) => 
   const [nativeResult, setNativeResult] = useState<NativeRephrase | null>(null);
   const [nativeChecking, setNativeChecking] = useState(false);
 
-  const shadowPool = useMemo(() => wordsWithExamples(words), [words]);
-
   useEffect(() => {
-    if (!shadowWord && shadowPool.length) setShadowWord(pickRandom(shadowPool));
     if (!recallWord && words.length) setRecallWord(pickRandom(words));
     if (!sentenceWord && words.length) setSentenceWord(pickRandom(words));
-  }, [shadowPool, words, shadowWord, recallWord, sentenceWord]);
+  }, [words, recallWord, sentenceWord]);
 
   useEffect(() => () => { recordingRef.current?.cancel(); speechService.stopSpeaking(); }, []);
 
@@ -135,7 +126,6 @@ export const Speaking: React.FC<SpeakingProps> = ({ words, onExerciseDone }) => 
   );
 
   const modeMeta: { id: SpeakingKind; label: string; icon: React.ReactNode }[] = [
-    { id: 'shadow', label: 'Shadowing', icon: <Ear className="w-3.5 h-3.5" /> },
     { id: 'recall', label: 'Recall', icon: <Lightbulb className="w-3.5 h-3.5" /> },
     { id: 'sentence', label: 'Speak a Sentence', icon: <MessageCircle className="w-3.5 h-3.5" /> },
     { id: 'native', label: 'Say It Natively', icon: <Sparkles className="w-3.5 h-3.5" /> },
@@ -173,62 +163,6 @@ export const Speaking: React.FC<SpeakingProps> = ({ words, onExerciseDone }) => 
         <div className="bg-amber-50 border border-amber-100 text-amber-800 rounded-xl p-4 text-sm flex items-center gap-2 animate-fade-in">
           <AlertCircle className="w-4 h-4 shrink-0" /> {error}
         </div>
-      )}
-
-      {/* ---------- SHADOWING ---------- */}
-      {mode === 'shadow' && shadowWord && (
-        <div className="bg-white p-8 rounded-xl shadow-sm border border-stone-100 space-y-8">
-          <div className="space-y-2">
-            <p className="text-xs font-bold uppercase tracking-wider text-stone-400">Listen, then repeat this sentence</p>
-            <p className="text-2xl font-serif text-stone-900 leading-relaxed">
-              {shadowDiff
-                ? shadowDiff.tokens.map((t, i) => (
-                    <span key={i} className={t.hit ? 'text-stone-900' : 'text-red-500 underline decoration-red-300 decoration-2'}>{t.text} </span>
-                  ))
-                : exampleOf(shadowWord)}
-            </p>
-            <p className="text-sm text-stone-400">Target word: <span className="font-bold text-stone-600 capitalize">{shadowWord.word}</span></p>
-          </div>
-
-          <div className="flex items-center justify-center gap-10">
-            <div className="flex flex-col items-center gap-3">
-              <button
-                onClick={() => speechService.speak(exampleOf(shadowWord))}
-                className="w-20 h-20 rounded-full bg-white border-2 border-stone-900 text-stone-900 flex items-center justify-center shadow hover:bg-stone-50 transition-all"
-                title="Play the sentence"
-              >
-                <Volume2 className="w-7 h-7" />
-              </button>
-              <p className="text-xs text-stone-400 uppercase tracking-widest font-semibold">Play</p>
-            </div>
-            <RecordButton onTranscript={(t) => {
-              const diff = diffTranscript(exampleOf(shadowWord), t);
-              setShadowDiff(diff);
-              onExerciseDone(shadowWord, 'shadow', diff.accuracy >= 80);
-            }} />
-          </div>
-
-          {shadowDiff && (
-            <div className={`rounded-xl p-6 border animate-fade-in flex items-center justify-between ${shadowDiff.accuracy >= 80 ? 'bg-emerald-50/50 border-emerald-100' : 'bg-amber-50/50 border-amber-100'}`}>
-              <div className="flex items-center gap-3">
-                {shadowDiff.accuracy >= 80 ? <CheckCircle2 className="w-6 h-6 text-emerald-600" /> : <XCircle className="w-6 h-6 text-amber-600" />}
-                <div>
-                  <p className="font-bold text-stone-900">{shadowDiff.accuracy}% match</p>
-                  <p className="text-xs text-stone-500">Red words were missed or unclear — play and try again, or move on.</p>
-                </div>
-              </div>
-              <button
-                onClick={() => { setShadowDiff(null); setShadowWord(pickRandom(shadowPool)); }}
-                className="px-5 py-2.5 bg-stone-900 text-white rounded-full text-sm font-bold hover:bg-black transition-colors flex items-center gap-2"
-              >
-                Next <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-      {mode === 'shadow' && !shadowWord && (
-        <p className="text-center py-12 text-stone-400">No saved words with example sentences yet.</p>
       )}
 
       {/* ---------- RECALL ---------- */}
