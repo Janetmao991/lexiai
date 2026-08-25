@@ -34,11 +34,11 @@ const glossInstruction = (lang: string): string => {
   return `\n      5b. NATIVE GLOSS: For EVERY definition, fill "gloss" with a ${name} gloss of THAT specific sense. Requirements: (a) lead with the neutral core meaning as a dictionary would (e.g. for "rehash": 重新表述；重新整理（旧材料）), then, only if the word carries a register or connotation, append it in brackets, e.g. （常含贬义：老调重弹）; (b) never reduce a neutral word to a single idiom or slang gloss — idioms may appear only as the bracketed connotation note, never as the whole gloss; (c) 5–20 characters, separated by "；"; (d) use standard ${name} finance/business terminology for finance senses. Never leave it empty.`;
 };
 
-const getAi = () => {
+const getAi = (timeoutMs = 45000) => {
   const key = getApiKey();
   if (!key) throw new Error('No Gemini API key configured. Open Settings and paste your free key from aistudio.google.com/apikey.');
-  // 45s cap so a congested free-tier request fails visibly instead of spinning forever.
-  return new GoogleGenAI({ apiKey: key, httpOptions: { timeout: 45000 } });
+  // Cap so a congested request fails visibly instead of spinning forever.
+  return new GoogleGenAI({ apiKey: key, httpOptions: { timeout: timeoutMs } });
 };
 
 // Free-tier Gemini throws transient 503/429 blips; retry those quietly before
@@ -691,7 +691,9 @@ export const analyzeSentence = async (sentence: string): Promise<SentenceAnalysi
 };
 
 export const transcribeAudio = async (base64Audio: string, mimeType: string): Promise<string> => {
-  const ai = getAi();
+  // Interactive path: fail fast (15s, one retry) — a learner mid-exercise
+  // should see "try again" quickly, never a minute-long spinner.
+  const ai = getAi(15000);
   const response = await generateWithRetry(ai, {
     model: getTextModel(),
     contents: [{
@@ -701,7 +703,7 @@ export const transcribeAudio = async (base64Audio: string, mimeType: string): Pr
       ],
     }],
     config: { thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL }, temperature: 0 },
-  });
+  }, 2);
   return (response.text || '').trim();
 };
 

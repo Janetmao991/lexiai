@@ -90,17 +90,25 @@ export const Speaking: React.FC<SpeakingProps> = ({ words, onExerciseDone }) => 
   const stopRecording = async () => {
     const handle = recordingRef.current;
     if (!handle) return;
+    const gen = recGen.current;
     setRecState('processing');
     try {
       const text = await handle.stop();
+      if (gen !== recGen.current) return; // user cancelled the wait — discard
       if (!text) throw new Error("Didn't catch that — please try speaking again, a bit louder.");
       ((handle as any)._consume as (t: string) => void)(text);
     } catch (e: any) {
-      setError(friendlyError(String(e?.message || 'Transcription failed.')));
+      if (gen === recGen.current) setError(friendlyError(String(e?.message || 'Transcription failed.')));
     } finally {
-      setRecState('idle');
+      if (gen === recGen.current) setRecState('idle');
       recordingRef.current = null;
     }
+  };
+
+  const cancelProcessing = () => {
+    recGen.current++;
+    recordingRef.current = null;
+    setRecState('idle');
   };
 
   const RecordButton: React.FC<{ onTranscript: (t: string) => void; onStart?: () => void; disabled?: boolean }> = ({ onTranscript, onStart, disabled }) => (
@@ -126,6 +134,11 @@ export const Speaking: React.FC<SpeakingProps> = ({ words, onExerciseDone }) => 
       <p className="text-xs text-stone-400 uppercase tracking-widest font-semibold">
         {recState === 'recording' ? 'Listening… speak now' : recState === 'starting' ? 'Opening mic…' : recState === 'processing' ? 'Transcribing…' : 'Tap to speak'}
       </p>
+      {recState === 'processing' && (
+        <button onClick={cancelProcessing} className="text-xs text-stone-400 underline underline-offset-2 hover:text-stone-700 transition-colors">
+          Cancel
+        </button>
+      )}
     </div>
   );
 
