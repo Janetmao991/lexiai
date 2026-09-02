@@ -142,6 +142,59 @@ const applyPrefsLocally = (prefs?: UserPrefs) => {
   else localStorage.removeItem(GLOSS_STORAGE);
 };
 
+const prevDayOf = (dateStr: string): string => {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d - 1);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+};
+
+/**
+ * Field-level merge of two stats blobs. A wholesale winner would let a stale
+ * device overwrite the streak earned on another one, so every field keeps its
+ * own best value — and streaks from consecutive days on different devices
+ * chain together instead of resetting.
+ */
+const mergeStats = (a: UserStats, b: UserStats): UserStats => {
+  const [late, early] = (a.lastActiveDate || '') >= (b.lastActiveDate || '') ? [a, b] : [b, a];
+  let streakCurrent = late.streakCurrent;
+  if (early.lastActiveDate && early.lastActiveDate === late.lastActiveDate) {
+    streakCurrent = Math.max(late.streakCurrent, early.streakCurrent);
+  } else if (early.lastActiveDate && late.lastActiveDate && early.lastActiveDate === prevDayOf(late.lastActiveDate)) {
+    // The other device was active the day before this one's latest day: the
+    // streak is unbroken across devices, so it extends rather than resets.
+    streakCurrent = Math.max(late.streakCurrent, early.streakCurrent + 1);
+  }
+  const daily =
+    a.daily.date === b.daily.date
+      ? {
+          ...a.daily,
+          reviews: Math.max(a.daily.reviews, b.daily.reviews),
+          newCards: Math.max(a.daily.newCards, b.daily.newCards),
+          practices: Math.max(a.daily.practices, b.daily.practices),
+          savedWords: Math.max(a.daily.savedWords, b.daily.savedWords),
+          podcasts: Math.max(a.daily.podcasts, b.daily.podcasts),
+          speaking: Math.max(a.daily.speaking, b.daily.speaking),
+          completedQuests: [...new Set([...a.daily.completedQuests, ...b.daily.completedQuests])],
+        }
+      : a.daily.date > b.daily.date ? a.daily : b.daily;
+  return {
+    xp: Math.max(a.xp, b.xp),
+    streakCurrent,
+    streakBest: Math.max(a.streakBest, b.streakBest, streakCurrent),
+    lastActiveDate: late.lastActiveDate,
+    achievements: { ...early.achievements, ...late.achievements },
+    totals: {
+      reviews: Math.max(a.totals.reviews, b.totals.reviews),
+      practices: Math.max(a.totals.practices, b.totals.practices),
+      podcasts: Math.max(a.totals.podcasts, b.totals.podcasts),
+      speaking: Math.max(a.totals.speaking, b.totals.speaking),
+    },
+    daily,
+    prefs: a.prefs, // merged separately by newerPrefs
+  };
+};
+
 /**
  * Pick the prefs that were changed most recently. A browser that chose a gloss
  * language before prefs existed in the cloud (localStorage only) counts as
@@ -198,8 +251,8 @@ export const statsService = {
   },
 
   /**
-   * Merge cloud stats on login: whichever side has more XP wins wholesale,
-   * then the result is pushed back up. Good enough for a single-owner app.
+   * Merge cloud stats on login field by field (see mergeStats), then push the
+   * result back up. Streaks survive switching devices this way.
    */
   syncWithCloud: async (userId: string) => {
     if (!supabase) return;
@@ -213,7 +266,7 @@ export const statsService = {
       if (error) throw new Error(error.message);
       const local = load();
       const remote: UserStats | null = data?.data ? { ...defaultStats(), ...data.data } : null;
-      const winner = remote && remote.xp > local.xp ? remote : local;
+      const winner = remote ? mergeStats(local, remote) : local;
       if (winner.daily.date !== todayStr()) winner.daily = emptyDaily();
       // Preferences merge independently of the XP winner: the most recent choice wins.
       const prefs = newerPrefs(local, remote);
