@@ -332,12 +332,15 @@ const App: React.FC = () => {
     { id: ViewState.PODCAST, label: 'Podcast', icon: <Radio className="w-5 h-5" /> },
   ];
 
+  // Embed mode (?embed=1): slim chrome for external lookup panels (e.g. Obsidian) — dictionary only.
+  const isEmbed = new URLSearchParams(window.location.search).has('embed');
+
   const accountLabel = session ? (session.user.email || '').split('@')[0] : 'Guest';
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] text-stone-900 font-sans">
       <header className="bg-white/80 backdrop-blur-md border-b border-stone-200 sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-4 h-20 flex justify-between items-center gap-3 md:gap-6">
+        <div className={`max-w-6xl mx-auto px-4 ${isEmbed ? 'h-14' : 'h-20'} flex justify-between items-center gap-3 md:gap-6`}>
           <div className="flex items-center gap-3 cursor-pointer group shrink-0" onClick={() => setView(ViewState.DICTIONARY)}>
             <div className="p-2 border border-stone-800 rounded-lg bg-stone-900 text-white shadow-inner">
               <GraduationCap className="w-5 h-5" />
@@ -345,7 +348,7 @@ const App: React.FC = () => {
             <span className="text-2xl font-serif font-bold tracking-tight">LexiAI</span>
           </div>
 
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className={`${isEmbed ? 'hidden' : 'hidden md:flex'} items-center gap-1`}>
             {navItems.map(item => (
               <button
                 key={item.id}
@@ -362,7 +365,7 @@ const App: React.FC = () => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowProgress(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-stone-200 bg-white text-xs font-bold text-stone-600 hover:border-stone-400 transition-all"
+              className={`${isEmbed ? 'hidden' : 'flex'} items-center gap-1.5 px-3 py-1.5 rounded-full border border-stone-200 bg-white text-xs font-bold text-stone-600 hover:border-stone-400 transition-all`}
               title="Your progress"
             >
               <Flame className={`w-3.5 h-3.5 ${stats.streakCurrent > 0 ? 'text-orange-500' : 'text-stone-300'}`} />
@@ -372,7 +375,7 @@ const App: React.FC = () => {
             </button>
             <button
               onClick={() => setShowAccount(true)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold uppercase tracking-wider transition-all ${
+              className={`${isEmbed ? 'hidden' : 'flex'} items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold uppercase tracking-wider transition-all ${
                 syncStatus === 'syncing' ? 'bg-amber-50 border-amber-100 text-amber-600' :
                 session ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-stone-100 border-stone-200 text-stone-400'
               }`}
@@ -582,7 +585,7 @@ const App: React.FC = () => {
         </div>
       )}
 
-      <main className="max-w-5xl mx-auto px-4 py-12 pb-28 md:pb-12">
+      <main className={`max-w-5xl mx-auto ${isEmbed ? 'px-4 py-5 pb-10' : 'px-4 py-12 pb-28 md:pb-12'}`}>
         {view === ViewState.DICTIONARY && <Dictionary onSave={handleSaveWord} savedWords={savedWords} lookupRequest={dictLookup} />}
         {view === ViewState.NOTEBOOK && <Notebook words={savedWords} onDelete={handleDeleteWord} onPractice={(w) => { setPracticeTarget(w); setView(ViewState.PRACTICE); }} onUpdateWord={handleSaveWord} />}
         {view === ViewState.FLASHCARDS && <Flashcards words={savedWords} onReview={handleReview} onGameComplete={handleGameComplete} onSpellCorrect={handleSpellCorrect} newCardsToday={stats.daily.newCards ?? 0} />}
@@ -593,7 +596,7 @@ const App: React.FC = () => {
 
       {/* Mobile bottom tab bar — the desktop nav above is hidden below md */}
       <nav
-        className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-white/90 backdrop-blur-md border-t border-stone-200"
+        className={`${isEmbed ? 'hidden' : 'md:hidden'} fixed bottom-0 inset-x-0 z-50 bg-white/90 backdrop-blur-md border-t border-stone-200`}
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <div className="grid grid-cols-6">
