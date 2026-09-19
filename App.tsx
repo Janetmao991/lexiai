@@ -72,6 +72,15 @@ const App: React.FC = () => {
     return unsubscribe;
   }, []);
 
+  // Deep link: ?q=word (e.g. from Obsidian's lookup bubble) jumps straight to a Dictionary lookup.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get('q');
+    if (q && q.trim()) {
+      setView(ViewState.DICTIONARY);
+      setDictLookup({ word: q.trim(), n: Date.now() });
+    }
+  }, []);
+
   // Track auth session
   useEffect(() => {
     if (!supabase) return;
