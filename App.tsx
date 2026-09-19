@@ -424,7 +424,7 @@ const App: React.FC = () => {
 
       {showAccount && (
         <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-8 space-y-6 animate-fade-in-up">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-8 space-y-6 animate-fade-in-up max-h-[calc(100dvh-2rem)] overflow-y-auto">
               <div className="flex justify-between items-center">
                 <h3 className="text-2xl font-serif font-bold">{session ? 'Account' : authMode === 'signin' ? 'Sign In' : authMode === 'signup' ? 'Create Account' : 'Reset Password'}</h3>
                 <button onClick={() => { setShowAccount(false); setAuthMessage(null); }} className="text-stone-400 hover:text-stone-900"><X /></button>
@@ -532,7 +532,7 @@ const App: React.FC = () => {
       {/* Set-new-password modal (opened by the reset-email link) */}
       {showReset && (
         <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-8 space-y-5 animate-fade-in-up">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-8 space-y-5 animate-fade-in-up max-h-[calc(100dvh-2rem)] overflow-y-auto">
             <div className="flex justify-between items-center">
               <h3 className="text-2xl font-serif font-bold">Set New Password</h3>
               <button onClick={() => setShowReset(false)} className="text-stone-400 hover:text-stone-900"><X /></button>

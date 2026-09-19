@@ -36,7 +36,7 @@ export const Settings: React.FC<SettingsProps> = ({ onClose }) => {
 
   return (
     <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-8 space-y-6 animate-fade-in-up" onClick={e => e.stopPropagation()}>
+      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-8 space-y-6 animate-fade-in-up max-h-[calc(100dvh-2rem)] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="flex justify-between items-center">
           <h3 className="text-2xl font-serif font-bold">Settings</h3>
           <button onClick={onClose} className="text-stone-400 hover:text-stone-900"><X /></button>
