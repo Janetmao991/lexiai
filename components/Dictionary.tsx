@@ -74,7 +74,17 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
   };
 
   useEffect(() => {
-    if (lookupRequest?.word) doLookup(lookupRequest.word);
+    const w = lookupRequest?.word?.trim();
+    if (!w) return;
+    if (w.split(/\s+/).length > 4) {
+      // Sentence-sized request (e.g. ?q= deep link) → Sentence Breakdown
+      setActiveMode('ANALYZE');
+      resetResults();
+      setAnalyzeInput(w);
+      runAnalyze(w);
+    } else {
+      doLookup(w);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lookupRequest?.n]);
 
@@ -102,19 +112,23 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
     }
   };
 
-  const handleAnalyze = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!analyzeInput.trim()) return;
+  const runAnalyze = async (sentence: string) => {
     setLoading(true);
     setError('');
     try {
-      const data = await analyzeSentence(analyzeInput);
+      const data = await analyzeSentence(sentence);
       setAnalyzeResult(data);
     } catch (err) {
       setError('Failed to analyze sentence.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleAnalyze = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!analyzeInput.trim()) return;
+    runAnalyze(analyzeInput);
   };
 
   const handleSaveFromComparison = async (word: string) => {
