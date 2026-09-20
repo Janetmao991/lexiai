@@ -19,6 +19,8 @@ type DictionaryMode = 'DEFINE' | 'COMPARE' | 'ANALYZE';
 const normalizeForm = (s: string) =>
   s.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[.!?,;:]+$/, '');
 
+const IS_EMBED = new URLSearchParams(window.location.search).has('embed');
+
 export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, lookupRequest }) => {
   const [activeMode, setActiveMode] = useState<DictionaryMode>('DEFINE');
   const [loading, setLoading] = useState(false);
@@ -574,7 +576,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
         </div>
       )}
 
-      <DailyRead words={savedWords} />
+      {!IS_EMBED && <DailyRead words={savedWords} />}
     </div>
   );
 };

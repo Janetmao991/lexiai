@@ -72,6 +72,11 @@ const App: React.FC = () => {
     return unsubscribe;
   }, []);
 
+  // Embed mode: shrink everything so the small lookup panel shows more content.
+  useEffect(() => {
+    if (isEmbed) (document.body.style as any).zoom = '0.82';
+  }, []);
+
   // Deep link: ?q=word (e.g. from Obsidian's lookup bubble) jumps straight to a Dictionary lookup.
   useEffect(() => {
     const q = new URLSearchParams(window.location.search).get('q');
