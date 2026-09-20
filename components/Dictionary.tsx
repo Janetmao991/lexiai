@@ -537,9 +537,10 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
                                   }
                                 }}
                                 disabled={isSaved(item.word) || savingWord === item.word}
-                                className={`p-2 rounded-full transition-all ${isSaved(item.word) ? 'text-emerald-500 bg-emerald-50' : 'text-stone-300 hover:text-stone-900 hover:bg-stone-50'}`}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 border ${isSaved(item.word) ? 'text-emerald-600 bg-emerald-50 border-emerald-100' : 'text-stone-500 border-stone-200 hover:text-stone-900 hover:border-stone-400'}`}
                               >
-                                {savingWord === item.word ? <Loader2 className="w-5 h-5 animate-spin" /> : isSaved(item.word) ? <Check className="w-5 h-5" /> : <Save className="w-5 h-5" />}
+                                {savingWord === item.word ? <Loader2 className="w-4 h-4 animate-spin" /> : isSaved(item.word) ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+                                <span>{isSaved(item.word) ? 'Saved' : 'Save'}</span>
                               </button>
                            </div>
                            <p className="text-stone-500 text-base leading-relaxed font-serif italic">{item.definition}</p>
