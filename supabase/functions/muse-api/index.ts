@@ -7,7 +7,7 @@
 //
 // Auth: `Authorization: Bearer <MUSE_API_TOKEN>` (or `x-api-key: <MUSE_API_TOKEN>`).
 // Deploy with `--no-verify-jwt`; this function does its own auth and always scopes
-// every query to the single account named by LEXI_USER_EMAIL / LEXI_USER_ID.
+// every query to the single account named by LEXI_USER_EMAIL / LEXI_USER_ID (or the only user, if the project has one).
 //
 // Routes (all JSON):
 //   GET  /                 API description (self-documenting for agents)
@@ -80,15 +80,21 @@ let cachedUserId: string | null = null;
 async function userId(): Promise<string> {
   if (USER_ID_OVERRIDE) return USER_ID_OVERRIDE;
   if (cachedUserId) return cachedUserId;
-  if (!USER_EMAIL) throw new HttpError(500, "Server misconfigured: set LEXI_USER_EMAIL or LEXI_USER_ID secret.");
+  const users = [];
   for (let page = 1; page <= 20; page++) {
     const { data, error } = await sb.auth.admin.listUsers({ page, perPage: 200 });
     if (error) throw new HttpError(500, `auth lookup failed: ${error.message}`);
-    const hit = data.users.find((u) => (u.email ?? "").toLowerCase() === USER_EMAIL);
-    if (hit) { cachedUserId = hit.id; return hit.id; }
+    users.push(...data.users);
     if (data.users.length < 200) break;
   }
-  throw new HttpError(500, `No Supabase user with email ${USER_EMAIL}.`);
+  if (USER_EMAIL) {
+    const hit = users.find((u) => (u.email ?? "").toLowerCase() === USER_EMAIL);
+    if (!hit) throw new HttpError(500, `No Supabase user with email ${USER_EMAIL}.`);
+    cachedUserId = hit.id; return hit.id;
+  }
+  // No email configured: a personal project normally has exactly one account, so use it.
+  if (users.length === 1) { cachedUserId = users[0].id; return users[0].id; }
+  throw new HttpError(500, `Project has ${users.length} users; set LEXI_USER_EMAIL or LEXI_USER_ID secret to pick one.`);
 }
 
 // ---------- data access ----------

@@ -7,3 +7,6 @@ dist/
 data-backup/
 dist/
 dev-dist/
+
+# Supabase CLI scratch
+supabase/.temp/
