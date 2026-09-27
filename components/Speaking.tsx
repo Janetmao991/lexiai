@@ -184,7 +184,7 @@ export const Speaking: React.FC<SpeakingProps> = ({ words, onExerciseDone }) => 
 
       {/* ---------- RECALL ---------- */}
       {mode === 'recall' && recallWord && (
-        <div className="bg-white p-8 rounded-xl shadow-sm border border-stone-100 space-y-8">
+        <div className="bg-white p-5 sm:p-8 rounded-xl shadow-sm border border-stone-100 space-y-8">
           <div className="space-y-2">
             <p className="text-xs font-bold uppercase tracking-wider text-stone-400">Say the word that matches this definition</p>
             <p className="text-2xl font-serif text-stone-900 leading-relaxed italic">“{definitionOf(recallWord)}”</p>
@@ -224,7 +224,7 @@ export const Speaking: React.FC<SpeakingProps> = ({ words, onExerciseDone }) => 
       {/* ---------- SPEAK A SENTENCE ---------- */}
       {mode === 'sentence' && sentenceWord && (
         <div className="space-y-8">
-          <div className="bg-white p-8 rounded-xl shadow-sm border border-stone-100 space-y-8">
+          <div className="bg-white p-5 sm:p-8 rounded-xl shadow-sm border border-stone-100 space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-stone-400 mb-2">Target Word</label>
@@ -297,7 +297,7 @@ export const Speaking: React.FC<SpeakingProps> = ({ words, onExerciseDone }) => 
                   {feedback.score}/100
                 </span>
               </div>
-              <div className="p-8 bg-white space-y-6">
+              <div className="p-5 sm:p-8 bg-white space-y-6">
                 <p className="text-stone-700 leading-relaxed font-serif text-lg">{feedback.explanation}</p>
                 {!feedback.isCorrect && (
                   <div className="bg-stone-50 p-6 rounded-lg border-l-4 border-amber-400">
@@ -320,7 +320,7 @@ export const Speaking: React.FC<SpeakingProps> = ({ words, onExerciseDone }) => 
       {/* ---------- SAY IT NATIVELY ---------- */}
       {mode === 'native' && (
         <div className="space-y-8">
-          <div className="bg-white p-8 rounded-xl shadow-sm border border-stone-100 space-y-8">
+          <div className="bg-white p-5 sm:p-8 rounded-xl shadow-sm border border-stone-100 space-y-8">
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-xs font-bold uppercase tracking-wider text-stone-400">Say anything — or take the prompt</p>
@@ -384,7 +384,7 @@ export const Speaking: React.FC<SpeakingProps> = ({ words, onExerciseDone }) => 
                   {nativeResult.naturalness}/100 natural
                 </span>
               </div>
-              <div className="p-8 bg-white space-y-6">
+              <div className="p-5 sm:p-8 bg-white space-y-6">
                 <div className="bg-stone-50 p-6 rounded-lg border-l-4 border-emerald-400">
                   <div className="flex items-center justify-between mb-2">
                     <h4 className="text-xs font-bold text-stone-500 uppercase tracking-wider">A native would say</h4>

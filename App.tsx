@@ -590,7 +590,7 @@ const App: React.FC = () => {
         </div>
       )}
 
-      <main className={`max-w-5xl mx-auto ${isEmbed ? 'px-4 py-5 pb-10' : 'px-4 py-12 pb-28 md:pb-12'}`}>
+      <main className={`max-w-5xl mx-auto ${isEmbed ? 'px-4 py-5 pb-10' : 'px-3 sm:px-4 py-8 sm:py-12 pb-28 md:pb-12'}`}>
         {view === ViewState.DICTIONARY && <Dictionary onSave={handleSaveWord} savedWords={savedWords} lookupRequest={dictLookup} />}
         {view === ViewState.NOTEBOOK && <Notebook words={savedWords} onDelete={handleDeleteWord} onPractice={(w) => { setPracticeTarget(w); setView(ViewState.PRACTICE); }} onUpdateWord={handleSaveWord} />}
         {view === ViewState.FLASHCARDS && <Flashcards words={savedWords} onReview={handleReview} onGameComplete={handleGameComplete} onSpellCorrect={handleSpellCorrect} newCardsToday={stats.daily.newCards ?? 0} />}

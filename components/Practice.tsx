@@ -63,7 +63,7 @@ export const Practice: React.FC<PracticeProps> = ({ initialWord, words, onScored
          <h2 className="text-3xl font-serif font-bold text-stone-800">Active Practice</h2>
       </div>
 
-      <div className="bg-white p-8 rounded-xl shadow-sm border border-stone-100">
+      <div className="bg-white p-5 sm:p-8 rounded-xl shadow-sm border border-stone-100">
         <div className="space-y-6">
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -135,7 +135,7 @@ export const Practice: React.FC<PracticeProps> = ({ initialWord, words, onScored
             </span>
           </div>
           
-          <div className="p-8 bg-white space-y-8">
+          <div className="p-5 sm:p-8 bg-white space-y-8">
             <div>
                <h4 className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-3">Analysis</h4>
                <p className="text-stone-700 leading-relaxed font-serif text-lg">{feedback.explanation}</p>

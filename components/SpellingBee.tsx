@@ -131,7 +131,7 @@ export const SpellingBee: React.FC<SpellingBeeProps> = ({ words, onCorrect }) =>
     const perfect = sessionTotal > 0 && sessionCorrect === sessionTotal;
     return (
       <div className="w-full">
-        <div className="bg-white rounded-xl shadow-lg border border-stone-100 p-10 text-center space-y-5">
+        <div className="bg-white rounded-xl shadow-lg border border-stone-100 p-6 sm:p-10 text-center space-y-5">
           <Trophy className={`w-10 h-10 mx-auto ${perfect ? 'text-amber-500' : 'text-stone-300'}`} />
           <h3 className="text-3xl font-serif font-bold text-stone-900">
             {perfect ? 'Perfect round!' : 'Round complete'}
@@ -166,7 +166,7 @@ export const SpellingBee: React.FC<SpellingBeeProps> = ({ words, onCorrect }) =>
         <div className="h-full bg-stone-900 rounded-full transition-all duration-500" style={{ width: `${(index / queue.length) * 100}%` }} />
       </div>
 
-      <div className="bg-white rounded-xl shadow-lg border border-stone-100 p-8 space-y-6">
+      <div className="bg-white rounded-xl shadow-lg border border-stone-100 p-5 sm:p-8 space-y-6">
         <div className="space-y-3">
           <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-full border bg-stone-50 text-stone-500 border-stone-100 inline-block">
             {partOfSpeech}

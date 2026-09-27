@@ -177,7 +177,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
   return (
     <div className="max-w-4xl mx-auto space-y-16 animate-fade-in pb-20">
       <div className="text-center space-y-6">
-        <h2 className="text-6xl font-serif font-bold text-stone-900 tracking-tight">LexiAI Toolkit</h2>
+        <h2 className="text-4xl sm:text-6xl font-serif font-bold text-stone-900 tracking-tight">LexiAI Toolkit</h2>
         <p className="text-stone-500 font-serif italic text-lg max-w-lg mx-auto">Select a tool below to sharpen your advanced English mastery.</p>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-12 max-w-3xl mx-auto px-4">
@@ -217,18 +217,18 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Lookup an advanced word..."
-                className="w-full pl-8 pr-16 py-6 rounded-3xl bg-white border border-stone-200 focus:border-stone-800 transition-all outline-none text-2xl shadow-lg hover:shadow-xl font-serif"
+                className="w-full pl-5 sm:pl-8 pr-14 sm:pr-16 py-4 sm:py-6 rounded-3xl bg-white border border-stone-200 focus:border-stone-800 transition-all outline-none text-lg sm:text-2xl shadow-lg hover:shadow-xl font-serif"
               />
-              <button type="submit" disabled={loading} className="absolute right-4 top-4 bottom-4 w-14 bg-stone-900 text-white rounded-2xl flex items-center justify-center hover:bg-black transition-all hover:scale-105 active:scale-95 shadow-md">
+              <button type="submit" disabled={loading} className="absolute right-2.5 top-2.5 bottom-2.5 w-11 sm:right-4 sm:top-4 sm:bottom-4 sm:w-14 bg-stone-900 text-white rounded-2xl flex items-center justify-center hover:bg-black transition-all hover:scale-105 active:scale-95 shadow-md">
                 {loading ? <Loader2 className="animate-spin w-6 h-6" /> : <Search className="w-6 h-6" />}
               </button>
             </form>
 
             {lookupResult && (
-              <div className="animate-fade-in-up bg-white rounded-[2.5rem] border border-stone-100 overflow-hidden shadow-2xl p-12">
-                <div className="flex flex-col md:flex-row justify-between items-start mb-12 gap-8">
-                  <div>
-                    <h1 className="text-6xl font-serif font-bold mb-5 tracking-tight capitalize text-stone-900">{lookupResult.word}</h1>
+              <div className="animate-fade-in-up bg-white rounded-3xl sm:rounded-[2.5rem] border border-stone-100 overflow-hidden shadow-2xl p-5 sm:p-12">
+                <div className="flex flex-col md:flex-row justify-between items-start mb-8 sm:mb-12 gap-5 md:gap-8">
+                  <div className="min-w-0 w-full md:w-auto">
+                    <h1 className="text-4xl sm:text-6xl font-serif font-bold mb-4 sm:mb-5 tracking-tight capitalize text-stone-900 break-words">{lookupResult.word}</h1>
                     <div className="flex items-center gap-5">
                       <span className="font-mono text-base text-stone-400 bg-stone-50 px-3 py-1 rounded-lg border border-stone-100">{ipaLabel(lookupResult.ipa, '/---/')}</span>
                       <button onClick={() => playPronunciation(lookupResult.word)} className="p-3 bg-stone-100 text-stone-900 rounded-full hover:bg-stone-900 hover:text-white transition-all hover:scale-110 shadow-sm">
@@ -318,7 +318,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
                   {lookupResult.meanings.map((m, i) => {
                     const isFinancial = isFinance(m.partOfSpeech);
                     return (
-                      <div key={i} className={`space-y-6 relative ${isFinancial ? 'p-8 pt-10 border border-stone-100 rounded-[2rem]' : ''}`}>
+                      <div key={i} className={`space-y-6 relative ${isFinancial ? 'p-4 pt-8 sm:p-8 sm:pt-10 border border-stone-100 rounded-2xl sm:rounded-[2rem]' : ''}`}>
                          {/* LEFT ACCENT BAR IS NOW GREY */}
                          {isFinancial && <div className="absolute left-0 top-10 bottom-10 w-1.5 bg-stone-300 rounded-r-full" />}
                          
@@ -335,8 +335,8 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
 
                          <div className="space-y-8">
                           {m.definitions.map((d, di) => (
-                            <div key={di} className={`space-y-6 ${isFinancial ? 'pl-2' : 'pl-6 border-l-2 border-stone-900/10'}`}>
-                                <p className={`text-2xl font-serif leading-tight font-bold tracking-tight text-stone-900`}>
+                            <div key={di} className={`space-y-6 ${isFinancial ? 'pl-2' : 'pl-4 sm:pl-6 border-l-2 border-stone-900/10'}`}>
+                                <p className={`text-xl sm:text-2xl font-serif leading-tight font-bold tracking-tight text-stone-900 break-words`}>
                                   {d.definition}
                                 </p>
                                 {d.gloss && (
@@ -394,8 +394,8 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
 
         {activeMode === 'COMPARE' && (
           <div className="space-y-12 animate-fade-in">
-            <div className="max-w-2xl mx-auto bg-white p-10 rounded-[2rem] border border-stone-100 shadow-xl space-y-8">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <div className="max-w-2xl mx-auto bg-white p-5 sm:p-10 rounded-2xl sm:rounded-[2rem] border border-stone-100 shadow-xl space-y-8">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
                 {compareInputs.map((val, idx) => (
                   <div key={idx}>
                     <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-400 px-1 mb-2 block">Word {idx + 1}</label>
@@ -423,7 +423,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
             </div>
 
             {compareResult && (
-              <div className="animate-fade-in-up bg-white p-12 rounded-[2.5rem] border border-stone-100 shadow-2xl space-y-12">
+              <div className="animate-fade-in-up bg-white p-5 sm:p-12 rounded-3xl sm:rounded-[2.5rem] border border-stone-100 shadow-2xl space-y-8 sm:space-y-12">
                 <div className="flex items-center gap-5 border-b border-stone-50 pb-8">
                   <div className="p-5 bg-stone-50 rounded-2xl border border-stone-100"><GitCompare className="w-8 h-8 text-stone-800" /></div>
                   <div>
@@ -432,7 +432,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
                   </div>
                 </div>
 
-                <div className="bg-stone-900 p-8 rounded-[1.5rem] shadow-lg relative overflow-hidden group">
+                <div className="bg-stone-900 p-5 sm:p-8 rounded-[1.5rem] shadow-lg relative overflow-hidden group">
                   <Sparkles className="absolute right-[-20px] top-[-20px] w-40 h-40 text-white opacity-[0.03] group-hover:scale-110 transition-transform duration-700" />
                   <h4 className="text-[10px] font-bold uppercase tracking-[0.3em] text-stone-500 mb-3 flex items-center gap-2">
                     <Sparkles className="w-4 h-4" /> Crucial Distinction
@@ -440,21 +440,21 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
                   <p className="text-xl font-serif text-stone-100 leading-relaxed font-medium relative z-10">{compareResult.keyDifference}</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12 pt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-12 pt-4">
                   {[
                     { word: compareResult.word1, nuance: compareResult.word1Nuance, example: compareResult.word1Example },
                     { word: compareResult.word2, nuance: compareResult.word2Nuance, example: compareResult.word2Example },
                     ...(compareResult.word3 ? [{ word: compareResult.word3, nuance: compareResult.word3Nuance, example: compareResult.word3Example }] : [])
                   ].map((item, idx) => (
                     <div key={idx} className="space-y-4">
-                      <div className="flex justify-between items-center border-b border-stone-100 pb-2 group/title">
-                        <h5 className="text-3xl font-serif font-bold capitalize text-stone-900 tracking-tight">{item.word}</h5>
+                      <div className="flex justify-between items-center gap-2 border-b border-stone-100 pb-2 group/title">
+                        <h5 className="text-2xl sm:text-3xl font-serif font-bold capitalize text-stone-900 tracking-tight break-words min-w-0">{item.word}</h5>
                         <button 
                           onClick={() => handleSaveFromComparison(item.word)}
                           disabled={isSaved(item.word) || savingWord === item.word}
-                          className={`p-2 rounded-full transition-all ${
-                            isSaved(item.word) 
-                            ? 'text-emerald-500 bg-emerald-50' 
+                          className={`p-2 rounded-full transition-all shrink-0 ${
+                            isSaved(item.word)
+                            ? 'text-emerald-500 bg-emerald-50'
                             : 'text-stone-300 hover:text-stone-900 hover:bg-stone-50'
                           }`}
                         >
@@ -479,14 +479,14 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
 
         {activeMode === 'ANALYZE' && (
           <div className="space-y-12 animate-fade-in">
-            <div className="max-w-2xl mx-auto bg-white p-10 rounded-[2.5rem] border border-stone-100 shadow-xl space-y-8">
+            <div className="max-w-2xl mx-auto bg-white p-5 sm:p-10 rounded-3xl sm:rounded-[2.5rem] border border-stone-100 shadow-xl space-y-8">
               <div>
                 <label className="text-[11px] font-bold uppercase tracking-[0.2em] text-stone-400 px-1 mb-3 block">Complex Sentence Input</label>
                 <textarea
                   value={analyzeInput}
                   onChange={(e) => setAnalyzeInput(e.target.value)}
                   placeholder="Paste a complex sentence from an article or book..."
-                  className="w-full h-44 p-8 bg-stone-50 border border-stone-100 rounded-[2rem] outline-none focus:border-stone-300 focus:bg-white font-serif leading-relaxed text-xl resize-none shadow-inner"
+                  className="w-full h-44 p-5 sm:p-8 bg-stone-50 border border-stone-100 rounded-2xl sm:rounded-[2rem] outline-none focus:border-stone-300 focus:bg-white font-serif leading-relaxed text-lg sm:text-xl resize-none shadow-inner"
                 />
               </div>
               <button 
@@ -499,13 +499,13 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
             </div>
 
             {analyzeResult && (
-              <div className="animate-fade-in-up bg-white p-12 rounded-[2.5rem] border border-stone-100 shadow-2xl space-y-12">
-                <div className="border-b border-stone-50 pb-10">
+              <div className="animate-fade-in-up bg-white p-5 sm:p-12 rounded-3xl sm:rounded-[2.5rem] border border-stone-100 shadow-2xl space-y-8 sm:space-y-12">
+                <div className="border-b border-stone-50 pb-8 sm:pb-10">
                   <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-stone-300 mb-4">Semantic Core</h3>
                   <p className="text-2xl font-serif text-stone-900 leading-relaxed font-semibold">{analyzeResult.meaning}</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-16">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-16">
                   <div className="space-y-10">
                     <h3 className="text-[11px] font-bold uppercase tracking-[0.3em] text-stone-400 flex items-center gap-3">
                       <div className="w-6 h-[1px] bg-stone-200" /> Tricky Bits
@@ -516,11 +516,11 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
                     <div className="space-y-10">
                       {analyzeResult.vocabularyBreakdown.map((item, idx) => (
                         <div key={idx} className="group relative pl-6 border-l border-stone-100">
-                           <div className="flex justify-between items-center mb-2">
+                           <div className="flex justify-between items-center gap-2 mb-2">
                               <button
                                 onClick={() => doLookup(item.word)}
                                 title="Look up in the dictionary"
-                                className="text-xl font-serif font-bold text-stone-900 capitalize tracking-tight hover:text-stone-600 hover:underline decoration-stone-300 decoration-2 underline-offset-4 transition-colors text-left"
+                                className="text-xl font-serif font-bold text-stone-900 capitalize tracking-tight hover:text-stone-600 hover:underline decoration-stone-300 decoration-2 underline-offset-4 transition-colors text-left break-words min-w-0"
                               >
                                 {item.word}
                               </button>

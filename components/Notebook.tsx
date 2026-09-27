@@ -211,7 +211,7 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onPractice,
 
   return (
     <div className={`transition-all duration-500 ease-in-out ${sidebarContext ? 'mr-0 lg:mr-[450px]' : ''}`}>
-      <div className="max-w-3xl mx-auto relative px-4">
+      <div className="max-w-3xl mx-auto relative px-0 sm:px-4">
         {/* Header Section */}
         <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 border-b border-stone-200 pb-6 gap-4">
           <div className="flex-1">
@@ -254,11 +254,11 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onPractice,
               const isExpanded = expandedWords.has(entry.word);
               return (
                 <div key={entry.word} className={`bg-white transition-all duration-300 ${isExpanded ? 'my-4 rounded-xl shadow-lg border border-stone-100' : 'hover:bg-stone-50/50'}`}>
-                  <div onClick={() => toggleWord(entry.word)} className="p-6 cursor-pointer flex justify-between items-center">
-                    <div className="flex-grow">
-                      <div className="flex items-center gap-4 mb-2">
-                        <h3 className="text-2xl font-serif font-bold text-stone-900 capitalize">{entry.word}</h3>
-                        <button onClick={(e) => { e.stopPropagation(); playPronunciation(entry.word); }} className="p-1.5 text-stone-400 hover:text-stone-900 hover:bg-stone-200/50 rounded-full transition-all">
+                  <div onClick={() => toggleWord(entry.word)} className="p-4 sm:p-6 cursor-pointer flex justify-between items-center gap-2">
+                    <div className="flex-grow min-w-0">
+                      <div className="flex items-center gap-2 sm:gap-4 mb-2">
+                        <h3 className="text-xl sm:text-2xl font-serif font-bold text-stone-900 capitalize break-words min-w-0">{entry.word}</h3>
+                        <button onClick={(e) => { e.stopPropagation(); playPronunciation(entry.word); }} className="p-1.5 text-stone-400 hover:text-stone-900 hover:bg-stone-200/50 rounded-full transition-all shrink-0">
                           <Volume2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -277,17 +277,17 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onPractice,
                         ))}
                       </div>
                     </div>
-                    <ChevronDown className={`w-5 h-5 text-stone-400 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
+                    <ChevronDown className={`w-5 h-5 text-stone-400 transition-transform duration-300 shrink-0 ${isExpanded ? 'rotate-180' : ''}`} />
                   </div>
 
                   {isExpanded && (
-                    <div className="px-6 pb-6 border-t border-stone-50 pt-6 animate-fade-in">
+                    <div className="px-4 pb-5 sm:px-6 sm:pb-6 border-t border-stone-50 pt-6 animate-fade-in">
                       {/* Definitions Rendering */}
                       <div className="space-y-8">
                           {entry.meanings.map((meaning, idx) => {
                               const isFinancial = isFinance(meaning.partOfSpeech);
                               return (
-                                <div key={idx} className={`relative space-y-6 ${isFinancial ? 'p-6 pb-10 border border-stone-100 rounded-2xl' : ''}`}>
+                                <div key={idx} className={`relative space-y-6 ${isFinancial ? 'p-4 pb-8 sm:p-6 sm:pb-10 border border-stone-100 rounded-2xl' : ''}`}>
                                     {/* LEFT ACCENT BAR IS NOW GREY */}
                                     {isFinancial && <div className="absolute left-0 top-8 bottom-8 w-1 bg-stone-300 rounded-r-full" />}
                                     
@@ -304,7 +304,7 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onPractice,
                                     
                                     {meaning.definitions.map((def, defIdx) => (
                                         <div key={defIdx} className={`space-y-4 ${isFinancial ? 'pl-2' : 'pl-4 border-l border-stone-200'}`}>
-                                            <p className={`font-serif text-2xl leading-tight font-bold tracking-tight text-stone-900`}>
+                                            <p className={`font-serif text-xl sm:text-2xl leading-tight font-bold tracking-tight text-stone-900 break-words`}>
                                                 {def.definition}
                                             </p>
                                             {def.gloss && (

@@ -211,7 +211,7 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
                </div>
              ) : (
                <div className="text-center space-y-4 w-full px-4">
-                  <h2 className={`${fontSizeClass} font-serif font-bold text-stone-900 capitalize tracking-tight`}>
+                  <h2 className={`${fontSizeClass} font-serif font-bold text-stone-900 capitalize tracking-tight break-words`}>
                     {currentCard.word}
                   </h2>
                   <div className="flex items-center justify-center gap-3">
@@ -246,7 +246,7 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
             )}
             {reversed ? (
               <div className="text-center space-y-4 w-full px-4">
-                <h2 className={`${fontSizeClass} font-serif font-bold text-white capitalize tracking-tight`}>
+                <h2 className={`${fontSizeClass} font-serif font-bold text-white capitalize tracking-tight break-words`}>
                   {currentCard.word}
                 </h2>
                 <div className="flex items-center justify-center gap-3">
