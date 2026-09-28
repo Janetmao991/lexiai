@@ -79,6 +79,10 @@ Otherwise run a quick drill: for each word, first show only the word and IPA and
 - "What does *at the margin* mean in my notebook?"（`/words/at the margin`）
 - "How many words are due today?"（`/stats`）
 
+## 当前状态（2026-09-27）
+已部署并接入 Muse。Muse 侧连接器名为 LexiAI，读取权限设为始终允许；定时任务为每晚约 9:14，推最多 8 个到期词（最难的优先），用户回复 again/hard/good/easy 后批量写回 `/reviews`。
+换 token：`supabase secrets set MUSE_API_TOKEN=<新值>` 后重新 deploy，并在 Muse 的连接器设置里更新凭证。
+
 ## 接口速查
 
 | 方法 | 路径 | 说明 |
