@@ -21,6 +21,24 @@ export interface UserContext {
   explanation: string;
   usageNuance: string;
   timestamp: number;
+  /** Which sense of the entry this sentence uses (indices into meanings[m].definitions[d]). */
+  sense?: { meaning: number; definition: number };
+}
+
+/** "Meaning in context": what a word means in one specific sentence. */
+export interface ContextMeaning {
+  /** Dictionary headword form (lemma / base phrase) of the focus item. */
+  word: string;
+  /** The exact text as it appears in the sentence. */
+  surface: string;
+  meaningHere: string;
+  glossHere?: string;
+  /** The more common sense a learner probably knows — empty when this IS the common sense. */
+  usualMeaning: string;
+  usualGloss?: string;
+  clues: { quote: string; why: string }[];
+  paraphrase: string;
+  paraphraseGloss?: string;
 }
 
 export type SrsRating = 'again' | 'hard' | 'good' | 'easy';

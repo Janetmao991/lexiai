@@ -14,11 +14,10 @@ interface Message {
 interface NotebookProps {
   words: WordEntry[];
   onDelete: (word: string) => void;
-  onPractice: (word: WordEntry) => void;
   onUpdateWord: (updatedWord: WordEntry) => void;
 }
 
-export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onPractice, onUpdateWord }) => {
+export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onUpdateWord }) => {
   const [expandedWords, setExpandedWords] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [visibleCount, setVisibleCount] = useState(100);
@@ -399,7 +398,6 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onPractice,
 
                       <div className="mt-8 pt-4 flex justify-between items-center border-t border-stone-100">
                         <button onClick={(e) => { e.stopPropagation(); onDelete(entry.word); }} className="text-stone-300 hover:text-red-600 text-[10px] font-bold uppercase tracking-widest transition-colors">Delete Word</button>
-                        <button onClick={() => onPractice(entry)} className="flex items-center gap-2 px-6 py-2.5 bg-stone-900 text-white text-xs font-bold uppercase tracking-widest rounded-full hover:bg-black shadow-md transition-all">Practice <ArrowRight className="w-4 h-4" /></button>
                       </div>
                     </div>
                   )}
@@ -427,7 +425,7 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onPractice,
       >
         {sidebarContext && (
             <div className="flex flex-col h-full overflow-hidden">
-                <div className="p-6 border-b border-stone-100 bg-[#FDFBF7] relative">
+                <div className="p-6 border-b border-stone-100 bg-[#FBF9F4] relative">
                     <div className="flex justify-between items-start mb-4">
                         <div className="flex items-center gap-3">
                             <div className="p-1.5 bg-stone-900 text-white rounded shadow"><MessageSquare className="w-4 h-4" /></div>

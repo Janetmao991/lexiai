@@ -2,12 +2,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Dictionary } from './components/Dictionary.tsx';
 import { Notebook } from './components/Notebook.tsx';
-import { Flashcards } from './components/Flashcards.tsx';
-import { Practice } from './components/Practice.tsx';
-import { Podcast } from './components/Podcast.tsx';
-import { Speaking, SpeakingKind } from './components/Speaking.tsx';
+import { Flashcards, DAILY_NEW_CARD_LIMIT } from './components/Flashcards.tsx';
 import { WordEntry, ViewState, SrsRating, UserStats } from './types.ts';
-import { Book, GraduationCap, LayoutGrid, Layers, PenTool, X, Cloud, CloudOff, Loader2, Mic2, Radio, Database, Terminal, LogOut, Download, Upload, Flame, Settings as SettingsIcon } from 'lucide-react';
+import { Search, LayoutGrid, Layers, X, Cloud, CloudOff, Loader2, Database, Terminal, LogOut, Download, Upload, Flame, Settings as SettingsIcon } from 'lucide-react';
 import { localStorageService } from './services/localStorageService.ts';
 import { syncService } from './services/syncService.ts';
 import { cloudService } from './services/cloudService.ts';
@@ -22,7 +19,6 @@ import type { Session } from '@supabase/supabase-js';
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>(ViewState.DICTIONARY);
-  const [practiceTarget, setPracticeTarget] = useState<WordEntry | undefined>(undefined);
 
   const [savedWords, setSavedWords] = useState<WordEntry[]>([]);
 
@@ -45,7 +41,7 @@ const App: React.FC = () => {
   // One warning per session when the device can't store the notebook locally.
   const storageWarnedRef = useRef(false);
   // Lookup requested from outside Dictionary (word chips in Ask Lexi).
-  const [dictLookup, setDictLookup] = useState<{ word: string; n: number } | null>(null);
+  const [dictLookup, setDictLookup] = useState<{ word: string; n: number; focus?: string } | null>(null);
 
   // Password recovery (arrived via reset-email link)
   const [showReset, setShowReset] = useState(false);
@@ -78,11 +74,13 @@ const App: React.FC = () => {
   }, []);
 
   // Deep link: ?q=word (e.g. from Obsidian's lookup bubble) jumps straight to a Dictionary lookup.
+  // ?q=<sentence>&w=<word> opens Meaning in context for that word in that sentence.
   useEffect(() => {
-    const q = new URLSearchParams(window.location.search).get('q');
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get('q');
     if (q && q.trim()) {
       setView(ViewState.DICTIONARY);
-      setDictLookup({ word: q.trim(), n: Date.now() });
+      setDictLookup({ word: q.trim(), n: Date.now(), focus: params.get('w')?.trim() || undefined });
     }
   }, []);
 
@@ -187,24 +185,8 @@ const App: React.FC = () => {
     statsService.record('review', allWords());
   };
 
-  const handlePracticeScored = (word: WordEntry, score: number) => {
-    const best = Math.max(word.mastery?.bestPracticeScore ?? 0, score);
-    if (best !== word.mastery?.bestPracticeScore) {
-      handleSaveWord({ ...word, mastery: { ...word.mastery, bestPracticeScore: best } });
-    }
-    statsService.record(score >= 80 ? 'practiceHigh' : 'practice', allWords());
-  };
-
   const handleGameComplete = () => statsService.record('game', allWords());
   const handleSpellCorrect = () => statsService.record('review', allWords());
-  const handlePodcastGenerated = () => statsService.record('podcast', allWords());
-
-  const handleSpeakingDone = (word: WordEntry, kind: SpeakingKind, passed: boolean) => {
-    if (kind === 'sentence' && passed && !word.mastery?.speakingPassed) {
-      handleSaveWord({ ...word, mastery: { ...word.mastery, speakingPassed: true } });
-    }
-    if (passed) statsService.record('speaking', allWords());
-  };
 
   const handleDeleteWord = async (wordId: string) => {
     localStorageService.deleteWord(wordId);
@@ -328,13 +310,17 @@ const App: React.FC = () => {
     }
   };
 
+  // Same queue the Review tab builds: due cards in rotation + today's new-card allowance.
+  const reviewDue = (() => {
+    const learning = savedWords.filter(w => w.srs && srsService.isDue(w)).length;
+    const fresh = savedWords.filter(w => !w.srs).length;
+    return learning + Math.min(fresh, Math.max(0, DAILY_NEW_CARD_LIMIT - (stats.daily.newCards ?? 0)));
+  })();
+
   const navItems = [
-    { id: ViewState.DICTIONARY, label: 'Dictionary', icon: <Book className="w-5 h-5" /> },
-    { id: ViewState.NOTEBOOK, label: 'Notebook', icon: <LayoutGrid className="w-5 h-5" /> },
-    { id: ViewState.FLASHCARDS, label: 'Flashcards', icon: <Layers className="w-5 h-5" /> },
-    { id: ViewState.PRACTICE, label: 'Practice', icon: <PenTool className="w-5 h-5" /> },
-    { id: ViewState.SPEAKING, label: 'Speaking', icon: <Mic2 className="w-5 h-5" /> },
-    { id: ViewState.PODCAST, label: 'Podcast', icon: <Radio className="w-5 h-5" /> },
+    { id: ViewState.DICTIONARY, label: 'Look up', icon: <Search className="w-5 h-5" />, badge: 0 },
+    { id: ViewState.NOTEBOOK, label: 'Notebook', icon: <LayoutGrid className="w-5 h-5" />, badge: 0 },
+    { id: ViewState.FLASHCARDS, label: 'Review', icon: <Layers className="w-5 h-5" />, badge: reviewDue },
   ];
 
   // Embed mode (?embed=1): slim chrome for external lookup panels (e.g. Obsidian) — dictionary only.
@@ -343,26 +329,29 @@ const App: React.FC = () => {
   const accountLabel = session ? (session.user.email || '').split('@')[0] : 'Guest';
 
   return (
-    <div className="min-h-screen bg-[#FDFBF7] text-stone-900 font-sans">
-      <header className="bg-white/80 backdrop-blur-md border-b border-stone-200 sticky top-0 z-50">
-        <div className={`max-w-6xl mx-auto px-4 ${isEmbed ? 'h-14' : 'h-20'} flex justify-between items-center gap-3 md:gap-6`}>
-          <div className="flex items-center gap-3 cursor-pointer group shrink-0" onClick={() => setView(ViewState.DICTIONARY)}>
-            <div className="p-2 border border-stone-800 rounded-lg bg-stone-900 text-white shadow-inner">
-              <GraduationCap className="w-5 h-5" />
-            </div>
-            <span className="text-2xl font-serif font-bold tracking-tight">LexiAI</span>
-          </div>
+    <div className="min-h-screen bg-[#FBF9F4] text-stone-900">
+      <header className="bg-[#FBF9F4]/85 backdrop-blur-md border-b border-[#EDE8DE] sticky top-0 z-50">
+        <div className={`max-w-5xl mx-auto px-4 sm:px-6 ${isEmbed ? 'h-14' : 'h-[72px]'} flex justify-between items-center gap-3 md:gap-6`}>
+          <button className="shrink-0 text-[26px] leading-none font-serif font-semibold tracking-tight text-stone-900" onClick={() => setView(ViewState.DICTIONARY)}>
+            LexiAI
+          </button>
 
-          <nav className={`${isEmbed ? 'hidden' : 'hidden md:flex'} items-center gap-1`}>
+          <nav className={`${isEmbed ? 'hidden' : 'hidden md:flex'} items-stretch self-stretch gap-2`}>
             {navItems.map(item => (
               <button
                 key={item.id}
                 onClick={() => setView(item.id)}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${
-                  view === item.id ? 'bg-stone-800 text-white shadow-md' : 'text-stone-500 hover:bg-stone-100'
+                aria-current={view === item.id ? 'page' : undefined}
+                className={`px-4 text-sm transition-colors flex items-center gap-2 border-b-[1.5px] ${
+                  view === item.id ? 'border-stone-900 text-stone-900 font-semibold' : 'border-transparent text-stone-500 hover:text-stone-900'
                 }`}
               >
                 {item.label}
+                {item.badge > 0 && (
+                  <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-stone-900 text-white text-[11px] font-semibold flex items-center justify-center">
+                    {item.badge > 99 ? '99+' : item.badge}
+                  </span>
+                )}
               </button>
             ))}
           </nav>
@@ -592,11 +581,8 @@ const App: React.FC = () => {
 
       <main className={`max-w-5xl mx-auto ${isEmbed ? 'px-4 py-5 pb-10' : 'px-3 sm:px-4 py-8 sm:py-12 pb-28 md:pb-12'}`}>
         {view === ViewState.DICTIONARY && <Dictionary onSave={handleSaveWord} savedWords={savedWords} lookupRequest={dictLookup} />}
-        {view === ViewState.NOTEBOOK && <Notebook words={savedWords} onDelete={handleDeleteWord} onPractice={(w) => { setPracticeTarget(w); setView(ViewState.PRACTICE); }} onUpdateWord={handleSaveWord} />}
+        {view === ViewState.NOTEBOOK && <Notebook words={savedWords} onDelete={handleDeleteWord} onUpdateWord={handleSaveWord} />}
         {view === ViewState.FLASHCARDS && <Flashcards words={savedWords} onReview={handleReview} onGameComplete={handleGameComplete} onSpellCorrect={handleSpellCorrect} newCardsToday={stats.daily.newCards ?? 0} />}
-        {view === ViewState.PRACTICE && <Practice initialWord={practiceTarget} words={savedWords} onScored={handlePracticeScored} />}
-        {view === ViewState.SPEAKING && <Speaking words={savedWords} onExerciseDone={handleSpeakingDone} />}
-        {view === ViewState.PODCAST && <Podcast words={savedWords} onGenerated={handlePodcastGenerated} />}
       </main>
 
       {/* Mobile bottom tab bar — the desktop nav above is hidden below md */}
@@ -604,7 +590,7 @@ const App: React.FC = () => {
         className={`${isEmbed ? 'hidden' : 'md:hidden'} fixed bottom-0 inset-x-0 z-50 bg-white/90 backdrop-blur-md border-t border-stone-200`}
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
-        <div className="grid grid-cols-6">
+        <div className="grid grid-cols-3">
           {navItems.map(item => (
             <button
               key={item.id}
@@ -613,7 +599,14 @@ const App: React.FC = () => {
                 view === item.id ? 'text-stone-900' : 'text-stone-400'
               }`}
             >
-              {item.icon}
+              <span className="relative">
+                {item.icon}
+                {item.badge > 0 && (
+                  <span className="absolute -top-1.5 -right-3 min-w-[17px] h-[17px] px-1 rounded-full bg-stone-900 text-white text-[10px] font-semibold flex items-center justify-center">
+                    {item.badge > 99 ? '99+' : item.badge}
+                  </span>
+                )}
+              </span>
               {item.label}
             </button>
           ))}

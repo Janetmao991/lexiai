@@ -1,0 +1,16 @@
+{
+  "_note": "Podcasts indexed for 'Heard in podcasts'. 'everyday' = conversational English (main focus); 'work' = shows from podcast-dig's sources.json. Audio is never stored — clips play from the publisher's enclosure URL.",
+  "shows": [
+    {"name": "The Mel Robbins Podcast", "feed": "https://feeds.simplecast.com/UCwaTX1J", "kind": "everyday"},
+    {"name": "On Purpose with Jay Shetty", "feed": "https://feeds.megaphone.fm/on-purpose", "kind": "everyday"},
+    {"name": "The Honest Drink (THD)", "feed": "https://feed.xyzfm.space/l9flvldmafxb", "kind": "everyday"},
+    {"name": "The Diary Of A CEO", "feed": "https://rss2.flightcast.com/xmsftuzjjykcmqwolaqn6mdn", "kind": "everyday"},
+    {"name": "We Can Do Hard Things", "feed": "https://feeds.megaphone.fm/wcdht", "kind": "everyday"},
+    {"name": "Armchair Expert", "feed": "https://rss.art19.com/armchair-expert", "kind": "everyday"},
+    {"name": "SmartLess", "feed": "https://feeds.simplecast.com/hNaFxXpO", "kind": "everyday"},
+    {"name": "Hidden Brain", "feed": "https://feeds.simplecast.com/kwWc0lhf", "kind": "everyday"},
+    {"name": "Lenny's Podcast", "feed": "https://api.substack.com/feed/podcast/10845.rss", "kind": "work"},
+    {"name": "Odd Lots", "feed": "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/8a94442e-5a74-4fa2-8b8d-ae27003a8d6b/982f5071-765c-403d-969d-ae27003a8d83/podcast.rss", "kind": "work"},
+    {"name": "Acquired", "feed": "https://feeds.transistor.fm/acquired", "kind": "work"}
+  ]
+}

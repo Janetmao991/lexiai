@@ -10,3 +10,6 @@ dev-dist/
 
 # Supabase CLI scratch
 supabase/.temp/
+
+# Podcast corpus (local index, rebuildable)
+podcast/data/

@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type, Modality, ThinkingLevel, GenerateContentParameters, GenerateContentResponse } from "@google/genai";
-import { WordEntry, PracticeFeedback, NativeRephrase, ContextExplanation, PodcastScript, SynonymComparison, SentenceAnalysis } from "../types";
+import { WordEntry, PracticeFeedback, NativeRephrase, ContextExplanation, PodcastScript, SynonymComparison, SentenceAnalysis, ContextMeaning } from "../types";
 
 // ---- BYOK: the Gemini key lives in this browser only ----
 export const getApiKey = (): string =>
@@ -742,4 +742,94 @@ Requirements:
     },
   });
   return JSON.parse(response.text!);
+};
+
+// ---- Meaning in context ----
+
+const contextMeaningSchema = (withGloss: boolean) => ({
+  type: Type.OBJECT,
+  properties: {
+    word: { type: Type.STRING },
+    surface: { type: Type.STRING },
+    meaningHere: { type: Type.STRING },
+    usualMeaning: { type: Type.STRING },
+    clues: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: { quote: { type: Type.STRING }, why: { type: Type.STRING } },
+        required: ["quote", "why"],
+      },
+    },
+    paraphrase: { type: Type.STRING },
+    ...(withGloss ? {
+      glossHere: { type: Type.STRING },
+      usualGloss: { type: Type.STRING },
+      paraphraseGloss: { type: Type.STRING },
+    } : {}),
+  },
+  required: ["word", "surface", "meaningHere", "usualMeaning", "clues", "paraphrase",
+    ...(withGloss ? ["glossHere", "paraphraseGloss"] : [])],
+});
+
+/**
+ * Explain what one word/phrase means in THIS sentence — the sense actually used, contrasted
+ * with the sense a learner probably already knows. With no `focus`, the model picks the item
+ * most likely to mislead (a familiar word used in an unfamiliar sense beats a merely rare word).
+ */
+export const explainInContext = async (sentence: string, focus?: string): Promise<ContextMeaning | null> => {
+  const ai = getAi();
+  const glossLang = getGlossLang();
+  const glossName = GLOSS_LANGS.find(g => g.id === glossLang)?.name || glossLang;
+  const response = await generateWithRetry(ai, {
+    model: getTextModel(),
+    contents: `An advanced English learner (C1+) knows the common meanings of most words but gets confused when a sentence uses a word in a different sense. Sentence they are reading: "${sentence}"
+
+${focus
+  ? `FOCUS: "${focus}". If it is part of a larger phrasal verb, idiom or fixed expression in this sentence (e.g. "crop" in "crop up"), explain the whole expression.`
+  : `Pick the ONE word or expression in this sentence most likely to mislead them: prefer a familiar word used in a less common sense (e.g. "coup" meaning a big win, "gauge" meaning to estimate) over a word that is merely rare. Phrasal verbs and idioms count as one item.`}
+
+Fill:
+- word: its dictionary headword (base form, e.g. "gauges" → "gauge").
+- surface: the exact text as it appears in the sentence.
+- meaningHere: the sense used in THIS sentence, as a clear dictionary-style definition (one sentence).
+- usualMeaning: the more common sense this learner probably knows, in a few words — but ONLY if it differs from meaningHere; otherwise "".
+- clues: 1-3 items. "quote" = a short verbatim fragment of the sentence (use "…" to skip words) that signals this sense; "why" = a few plain words on what it tells you (e.g. "business, not politics").
+- paraphrase: the whole sentence restated in plain, simple English.${glossLang ? `
+- glossHere: a ${glossName} gloss of meaningHere (5-15 characters, "；"-separated).
+- usualGloss: a ${glossName} gloss of usualMeaning, or "" if usualMeaning is "".
+- paraphraseGloss: a natural ${glossName} translation of the whole sentence.` : ''}`,
+    config: {
+      thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+      responseMimeType: "application/json",
+      responseSchema: contextMeaningSchema(Boolean(glossLang)),
+      temperature: 0.2,
+    },
+  });
+  return response.text ? JSON.parse(response.text) : null;
+};
+
+/** Which sense of a dictionary entry a sentence uses — so a saved sentence can sit under its sense. */
+export const pickSense = async (entry: WordEntry, sentence: string, meaningHere: string): Promise<{ meaning: number; definition: number } | null> => {
+  const senses = entry.meanings.flatMap((m, mi) =>
+    m.definitions.map((d, di) => ({ mi, di, text: `${m.partOfSpeech}: ${d.definition}` })));
+  if (senses.length === 0) return null;
+  if (senses.length === 1) return { meaning: 0, definition: 0 };
+  const ai = getAi();
+  const response = await generateWithRetry(ai, {
+    model: getTextModel(),
+    contents: `Sentence: "${sentence}"
+In it, "${entry.word}" means: ${meaningHere}
+Which numbered sense below is that? Answer with its number.
+${senses.map((s, i) => `${i + 1}. ${s.text}`).join('\n')}`,
+    config: {
+      thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
+      responseMimeType: "application/json",
+      responseSchema: { type: Type.OBJECT, properties: { sense: { type: Type.NUMBER } }, required: ["sense"] },
+      temperature: 0,
+    },
+  });
+  const n = response.text ? Number(JSON.parse(response.text).sense) : NaN;
+  const hit = senses[n - 1];
+  return hit ? { meaning: hit.mi, definition: hit.di } : null;
 };

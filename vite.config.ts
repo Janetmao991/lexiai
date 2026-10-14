@@ -16,8 +16,8 @@ export default defineConfig(({ mode }) => {
           name: 'LexiAI — Advanced Learner Dictionary',
           short_name: 'LexiAI',
           description: 'AI-powered vocabulary workbench: lookup, notebook, spaced repetition, speaking practice and podcasts.',
-          theme_color: '#FDFBF7',
-          background_color: '#FDFBF7',
+          theme_color: '#FBF9F4',
+          background_color: '#FBF9F4',
           display: 'standalone',
           start_url: '/',
           icons: [
