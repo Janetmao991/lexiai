@@ -123,7 +123,7 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
     return (
       <div className="max-w-xl mx-auto flex flex-col items-center space-y-8 py-8">
         <div className="w-full flex flex-wrap justify-between items-center gap-3 px-2">
-          <h2 className="font-serif font-medium text-4xl tracking-[-0.02em] text-stone-900">Synonym Match</h2>
+          <h2 className="font-serif font-bold text-4xl tracking-[-0.02em] text-stone-900">Synonym Match</h2>
           {renderModeSwitch()}
         </div>
         <SynonymMatch words={words} onComplete={onGameComplete} />
@@ -135,7 +135,7 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
     return (
       <div className="max-w-xl mx-auto flex flex-col items-center space-y-8 py-8">
         <div className="w-full flex flex-wrap justify-between items-center gap-3 px-2">
-          <h2 className="font-serif font-medium text-4xl tracking-[-0.02em] text-stone-900">Spelling</h2>
+          <h2 className="font-serif font-bold text-4xl tracking-[-0.02em] text-stone-900">Spelling</h2>
           {renderModeSwitch()}
         </div>
         <SpellingBee words={words} onCorrect={onSpellCorrect} />
@@ -147,12 +147,12 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
     return (
       <div className="max-w-xl mx-auto flex flex-col items-center space-y-8 py-8">
         <div className="w-full flex flex-wrap justify-between items-center gap-3 px-2">
-          <h2 className="font-serif font-medium text-4xl tracking-[-0.02em] text-stone-900">Review</h2>
+          <h2 className="font-serif font-bold text-4xl tracking-[-0.02em] text-stone-900">Review</h2>
           {renderModeSwitch()}
         </div>
         <div className="w-full bg-white rounded-[26px] border border-[#EDE8DE] p-10 sm:p-16 text-center space-y-4 animate-fade-in">
           <CheckCircle2 className="w-10 h-10 text-[#9A5420] mx-auto stroke-[1.5]" />
-          <h3 className="text-3xl font-serif font-medium text-stone-900">All caught up</h3>
+          <h3 className="text-3xl font-serif font-bold text-stone-900">All caught up</h3>
           <p className="text-stone-500">
             {sessionDone > 0 ? `${sessionDone} ${sessionDone === 1 ? 'card' : 'cards'} reviewed this session. ` : ''}
             {newBacklog > 0
@@ -187,7 +187,7 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
     <div className="max-w-xl mx-auto flex flex-col space-y-6 py-4 sm:py-8">
       {/* Header row */}
       <div className="flex flex-wrap justify-between items-center gap-3">
-        <h2 className="font-serif font-medium text-4xl tracking-[-0.02em] text-stone-900">Review</h2>
+        <h2 className="font-serif font-bold text-4xl tracking-[-0.02em] text-stone-900">Review</h2>
         {renderModeSwitch()}
       </div>
       <div className="flex items-center gap-3.5">
@@ -216,7 +216,7 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
               <div className="border-t border-[#F2EEE6] pt-5 grid grid-cols-[32px_minmax(0,1fr)] gap-x-1.5 animate-fade-in">
                 <span aria-hidden="true" className="font-serif italic text-[17px] text-[#B5AFA3] leading-[1.45]">{ctx.sense ? `${ROMAN[ctx.sense.definition] ?? ctx.sense.definition + 1}.` : ''}</span>
                 <div className="space-y-2">
-                  <p className="font-serif text-xl leading-[1.38] font-medium text-stone-900">{ctxSense?.definition || ctx.explanation}</p>
+                  <p className="font-serif text-xl leading-[1.38] font-bold text-stone-900">{ctxSense?.definition || ctx.explanation}</p>
                   {ctxSense?.gloss && <p className="gloss">{ctxSense.gloss}</p>}
                   {ctxSense && ctx.explanation && ctx.explanation !== ctxSense.definition && (
                     <p className="text-sm text-[#6B675F] leading-relaxed">In your sentence: {ctx.explanation}</p>
@@ -232,7 +232,7 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
             <p className="text-sm text-[#8C8880]"><span className="font-serif italic">{firstPos}</span> · starts with <span className="font-semibold text-[#2B2A27] uppercase">{currentCard.word[0]}</span></p>
             {isFlipped && (
               <div className="border-t border-[#F2EEE6] pt-5 animate-fade-in space-y-2">
-                <h3 className={`${fontSizeClass} font-serif font-medium tracking-[-0.02em] text-stone-900 break-words`}>{currentCard.word}</h3>
+                <h3 className={`${fontSizeClass} font-serif font-bold tracking-[-0.02em] text-stone-900 break-words`}>{currentCard.word}</h3>
                 <span className="font-mono text-sm text-[#6B675F]">{ipaLabel(currentCard.ipa)}</span>
               </div>
             )}
@@ -240,7 +240,7 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
         ) : (
           <>
             <div className="space-y-3">
-              <h3 className={`${fontSizeClass} font-serif font-medium tracking-[-0.025em] text-stone-900 break-words`}>{currentCard.word}</h3>
+              <h3 className={`${fontSizeClass} font-serif font-bold tracking-[-0.025em] text-stone-900 break-words`}>{currentCard.word}</h3>
               <div className="flex items-center gap-3">
                 <span className="font-mono text-sm text-[#6B675F]">{ipaLabel(currentCard.ipa)}</span>
                 <button

@@ -13,3 +13,4 @@ supabase/.temp/
 
 # Podcast corpus (local index, rebuildable)
 podcast/data/
+podcast/.venv/

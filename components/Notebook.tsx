@@ -243,7 +243,7 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onUpdateWor
       <div className="max-w-[860px] mx-auto relative space-y-6">
         {/* Header */}
         <div className="flex items-baseline justify-between gap-4">
-          <h2 className="font-serif font-medium text-4xl tracking-[-0.02em] text-stone-900">Notebook</h2>
+          <h2 className="font-serif font-bold text-4xl tracking-[-0.02em] text-stone-900">Notebook</h2>
           <div className="flex items-center gap-2">
             <button onClick={() => window.location.reload()} className="p-2 text-[#B5AFA3] hover:text-stone-900 transition-colors" title="Force sync refresh">
               <RefreshCw className="w-4 h-4" />
@@ -377,7 +377,7 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onUpdateWor
                             <div key={di} className="grid grid-cols-[30px_minmax(0,1fr)] gap-x-1">
                               <span aria-hidden="true" className="font-serif italic text-[#B5AFA3] leading-[1.45]">{ROMAN[di] ?? di + 1}.</span>
                               <div className="space-y-2 min-w-0">
-                                <p className="font-serif text-lg leading-snug font-medium text-stone-900 break-words">{def.definition}</p>
+                                <p className="font-serif text-lg leading-snug font-bold text-stone-900 break-words">{def.definition}</p>
                                 {def.gloss && <p className="gloss !text-[15px]">{def.gloss}</p>}
                                 {def.examples?.[0] && (
                                   <p className="font-serif italic text-base leading-relaxed text-[#6B675F] pl-4 border-l border-[#EDE8DE]">“{def.examples[0].replace(/^["“]|["”]$/g, '')}”</p>

@@ -332,7 +332,7 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-[#FBF9F4] text-stone-900">
       <header className="bg-[#FBF9F4]/85 backdrop-blur-md border-b border-[#EDE8DE] sticky top-0 z-50">
         <div className={`max-w-5xl mx-auto px-4 sm:px-6 ${isEmbed ? 'h-14' : 'h-[72px]'} flex justify-between items-center gap-3 md:gap-6`}>
-          <button className="shrink-0 text-[26px] leading-none font-serif font-semibold tracking-tight text-stone-900" onClick={() => setView(ViewState.DICTIONARY)}>
+          <button className="shrink-0 text-[26px] leading-none font-serif font-bold tracking-tight text-stone-900" onClick={() => setView(ViewState.DICTIONARY)}>
             LexiAI
           </button>
 

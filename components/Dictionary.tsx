@@ -247,7 +247,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
         <span aria-hidden="true" className="font-serif italic text-xl text-[#B5AFA3] leading-[1.45]">{roman(di)}</span>
         <div className="space-y-5 min-w-0">
           <div className="space-y-2.5">
-            <p className="font-serif text-xl sm:text-2xl leading-[1.38] font-medium text-stone-900 break-words">{d.definition}</p>
+            <p className="font-serif text-xl sm:text-2xl leading-[1.38] font-bold text-stone-900 break-words">{d.definition}</p>
             {d.gloss && <p className="gloss">{d.gloss}</p>}
           </div>
 
@@ -255,7 +255,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
             <div className="flex flex-wrap items-baseline gap-x-3.5 gap-y-1.5">
               <span className="lx-label sm:min-w-[88px]">Synonyms</span>
               {d.synonyms.map((syn, si) => (
-                <button key={si} onClick={() => doLookup(syn)} className="font-serif text-[17px] text-[#2B2A27] border-b border-[#D9D3C7] hover:border-stone-900 hover:text-stone-900 transition-colors">
+                <button key={si} onClick={() => doLookup(syn)} className="text-sm font-medium text-stone-600 border-b border-[#D9D3C7] hover:border-stone-900 hover:text-stone-900 transition-colors">
                   {syn}
                 </button>
               ))}
@@ -362,7 +362,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
             <article className={`${card} animate-fade-in-up px-5 sm:px-16 py-9 sm:py-14 space-y-10 sm:space-y-12`}>
               <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
                 <div className="space-y-4 min-w-0">
-                  <h1 className="font-serif font-medium text-5xl sm:text-[84px] leading-[0.95] tracking-[-0.03em] text-stone-900 break-words">{lookupResult.word}</h1>
+                  <h1 className="font-serif font-bold text-5xl sm:text-[84px] leading-[0.95] tracking-[-0.03em] text-stone-900 break-words">{lookupResult.word}</h1>
                   <div className="flex items-center gap-3.5">
                     <span className="font-mono text-sm text-[#6B675F]">{ipaLabel(lookupResult.ipa, '/---/')}</span>
                     <span aria-hidden="true" className="w-px h-3.5 bg-[#E2DDD2]" />
@@ -405,7 +405,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
                   <p className="lx-label">Other ways to say it</p>
                   {lookupResult.candidates.map((c, ci) => (
                     <button key={ci} onClick={() => doLookup(c.word)} className="w-full text-left p-3 rounded-xl hover:bg-white transition-colors group">
-                      <span className="font-serif font-medium text-lg text-stone-900 group-hover:underline underline-offset-4">{c.word}</span>
+                      <span className="font-serif font-bold text-lg text-stone-900 group-hover:underline underline-offset-4">{c.word}</span>
                       <span className="text-sm text-[#6B675F] ml-3">{c.nuance}</span>
                     </button>
                   ))}
@@ -423,7 +423,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
                     if (isQuery) {
                       return (
                         <div key={vi} className="w-full text-left p-3 rounded-xl bg-white border border-[#EDE8DE]">
-                          <span className="font-serif font-medium text-lg text-stone-900">{v.form}</span>
+                          <span className="font-serif font-bold text-lg text-stone-900">{v.form}</span>
                           <span className="ml-3 lx-label align-middle">you searched</span>
                           <span className="text-sm text-[#6B675F] ml-3">{v.note}</span>
                         </div>
@@ -431,7 +431,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
                     }
                     return (
                       <button key={vi} onClick={() => doLookup(v.form)} className="w-full text-left p-3 rounded-xl hover:bg-white transition-colors group">
-                        <span className="font-serif font-medium text-lg text-stone-900 group-hover:underline underline-offset-4">{v.form}</span>
+                        <span className="font-serif font-bold text-lg text-stone-900 group-hover:underline underline-offset-4">{v.form}</span>
                         <span className="text-sm text-[#6B675F] ml-3">{v.note}</span>
                       </button>
                     );
@@ -535,7 +535,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
                         Full definition <ArrowRight className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    <p className="font-serif text-xl sm:text-2xl leading-[1.38] font-medium">{contextResult.meaningHere}</p>
+                    <p className="font-serif text-xl sm:text-2xl leading-[1.38] font-bold">{contextResult.meaningHere}</p>
                     {contextResult.glossHere && <p className="gloss">{contextResult.glossHere}</p>}
                   </div>
                 </section>
@@ -545,7 +545,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
                     <div className="px-5 py-4 bg-[#FBF9F4] space-y-1.5">
                       <p className="lx-label">Not the usual meaning</p>
                       <p className="font-serif text-lg leading-snug text-[#8C8880] line-through decoration-[#C9C2B4]">{contextResult.usualMeaning}</p>
-                      {contextResult.usualGloss && <p className="font-['Noto_Serif_SC',serif] text-sm tracking-[0.06em] text-[#8C8880]">{contextResult.usualGloss}</p>}
+                      {contextResult.usualGloss && <p className="font-['PingFang_SC','Hiragino_Sans_GB','Microsoft_YaHei',sans-serif] font-light text-sm tracking-[0.06em] text-[#8C8880]">{contextResult.usualGloss}</p>}
                     </div>
                     <div className="px-5 py-4 border-t sm:border-t-0 sm:border-l border-[#EDE8DE] space-y-1.5">
                       <p className="lx-label !text-[#9A5420]">But in this sentence</p>
@@ -571,7 +571,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
                 <section className="sm:ml-[52px] pl-5 border-l border-[#EDE8DE] space-y-2">
                   <h2 className="lx-label">The whole sentence, plainly</h2>
                   <p className="font-serif italic text-lg sm:text-[19px] leading-relaxed text-[#2B2A27]">“{contextResult.paraphrase}”</p>
-                  {contextResult.paraphraseGloss && <p className="font-['Noto_Serif_SC',serif] text-[15px] leading-loose tracking-[0.04em] text-[#6B675F]">{contextResult.paraphraseGloss}</p>}
+                  {contextResult.paraphraseGloss && <p className="font-['PingFang_SC','Hiragino_Sans_GB','Microsoft_YaHei',sans-serif] font-light text-[15px] leading-loose tracking-[0.04em] text-[#6B675F]">{contextResult.paraphraseGloss}</p>}
                 </section>
 
                 <div className="sm:ml-[52px]">
@@ -650,7 +650,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
                 <h4 className="text-[10px] font-bold uppercase tracking-[0.3em] text-stone-500 mb-3 flex items-center gap-2">
                   <Sparkles className="w-4 h-4" /> Crucial Distinction
                 </h4>
-                <p className="text-xl font-serif text-stone-100 leading-relaxed font-medium relative z-10">{compareResult.keyDifference}</p>
+                <p className="text-xl font-serif text-stone-100 leading-relaxed font-bold relative z-10">{compareResult.keyDifference}</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-12 pt-4">
