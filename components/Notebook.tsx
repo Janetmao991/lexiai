@@ -4,7 +4,7 @@ import { WordEntry, UserContext } from '../types';
 import { analyzeContextFromText, playPronunciation, askAboutContext } from '../services/geminiService';
 import { srsService, MASTERY_META } from '../services/srsService';
 import { ipaLabel } from '../services/format';
-import { Trash2, Book, ArrowRight, TrendingUp, ChevronDown, Plus, FileText, Loader2, X, Maximize2, Layers, CloudOff, RefreshCw, Check, Search, Volume2, MessageSquare, Send, Sparkles, BookOpen, Tag } from 'lucide-react';
+import { Trash2, Book, ArrowRight, ChevronDown, Plus, Loader2, X, RefreshCw, Search, Volume2, MessageSquare, Send, Sparkles, BookOpen } from 'lucide-react';
 
 interface Message {
   role: 'user' | 'model';
@@ -15,15 +15,18 @@ interface NotebookProps {
   words: WordEntry[];
   onDelete: (word: string) => void;
   onUpdateWord: (updatedWord: WordEntry) => void;
+  /** Open the word's full entry in Look up. */
+  onOpenWord?: (word: string) => void;
 }
 
-export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onUpdateWord }) => {
+export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onUpdateWord, onOpenWord }) => {
   const [expandedWords, setExpandedWords] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
+  const [filter, setFilter] = useState<'all' | 'sentences' | 'due'>('all');
   const [visibleCount, setVisibleCount] = useState(100);
 
   // Large notebooks: render incrementally so thousands of words stay snappy.
-  useEffect(() => { setVisibleCount(100); }, [searchQuery]);
+  useEffect(() => { setVisibleCount(100); }, [searchQuery, filter]);
   
   // Sidebar Chat States
   const [sidebarContext, setSidebarContext] = useState<{ word: WordEntry; context: UserContext } | null>(null);
@@ -55,11 +58,6 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onUpdateWor
       newSet.add(word);
     }
     setExpandedWords(newSet);
-  };
-
-  const isFinance = (pos: string) => {
-    const lower = pos.toLowerCase();
-    return lower.includes('finance') || lower.includes('business') || lower.includes('economic');
   };
 
   const handleSaveContext = async (wordEntry: WordEntry) => {
@@ -187,8 +185,10 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onUpdateWor
     });
   };
 
-  const filteredWords = words.filter(w => 
+  const filteredWords = words.filter(w =>
     w.word.toLowerCase().includes(searchQuery.toLowerCase())
+    && (filter !== 'sentences' || (w.contexts?.length ?? 0) > 0)
+    && (filter !== 'due' || (!!w.srs && srsService.isDue(w)))
   );
 
   const smartSuggestions = [
@@ -198,206 +198,200 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onUpdateWor
     "Explain the 'Summary for the Learner'."
   ];
 
+  const ROMAN = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x'];
+
+  /** Highlighter stroke under the word inside a saved sentence. */
+  const markWord = (text: string, word: string): React.ReactNode => {
+    const head = word.trim().split(/\s+/)[0] || word;
+    const stem = head.length > 4 && head.endsWith('e') ? head.slice(0, -1) : head;
+    const re = new RegExp(`(\\b${stem.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[\\w'-]*)`, 'gi');
+    return text.split(re).map((part, i) => i % 2 === 1 ? <span key={i} className="lx-mark">{part}</span> : part);
+  };
+
+  const senseOf = (entry: WordEntry, ctx: UserContext) => {
+    if (!ctx.sense) return null;
+    const def = entry.meanings[ctx.sense.meaning]?.definitions[ctx.sense.definition];
+    return def ? { label: ROMAN[ctx.sense.definition] ?? String(ctx.sense.definition + 1), def } : null;
+  };
+
   if (words.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-stone-400">
+      <div className="flex flex-col items-center justify-center py-20 text-[#8C8880]">
         <Book className="w-12 h-12 mb-4 opacity-20 stroke-[1]" />
-        <h3 className="text-xl font-serif mb-2">Your notebook is empty</h3>
-        <p className="text-stone-500">Search for words to build your collection.</p>
+        <h3 className="text-xl font-serif mb-2 text-stone-900">Your notebook is empty</h3>
+        <p>Look up a word or paste a sentence to start your collection.</p>
       </div>
     );
   }
 
+  const withSentences = words.filter(w => (w.contexts?.length ?? 0) > 0).length;
+  const dueCount = words.filter(w => w.srs && srsService.isDue(w)).length;
+  const filterChip = (id: typeof filter, label: string, count?: number) => (
+    <button
+      onClick={() => setFilter(id)}
+      aria-pressed={filter === id}
+      className={`min-h-[36px] px-3.5 rounded-full border text-[13px] transition-colors ${
+        filter === id ? 'bg-stone-900 border-stone-900 text-[#FBF9F4]' : 'border-[#E2DDD2] text-[#55524C] hover:border-stone-900'
+      }`}
+    >
+      {label}{count !== undefined && <span className={filter === id ? 'text-stone-400' : 'text-[#B5AFA3]'}> · {count}</span>}
+    </button>
+  );
+
   return (
     <div className={`transition-all duration-500 ease-in-out ${sidebarContext ? 'mr-0 lg:mr-[450px]' : ''}`}>
-      <div className="max-w-3xl mx-auto relative px-0 sm:px-4">
-        {/* Header Section */}
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 border-b border-stone-200 pb-6 gap-4">
-          <div className="flex-1">
-            <h2 className="text-3xl font-serif font-bold text-stone-800">Vocabulary</h2>
-            <div className="relative mt-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
-              <input 
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search your notes..."
-                className="w-full pl-9 pr-4 py-2 bg-stone-100 border-none rounded-lg text-sm focus:ring-1 focus:ring-stone-300 outline-none transition-all font-medium"
-              />
-            </div>
-          </div>
-          <div className="flex items-center gap-4 justify-between sm:justify-end">
-             <div className="flex items-center gap-2">
-               <button onClick={() => window.location.reload()} className="p-2 text-stone-300 hover:text-stone-900 transition-colors" title="Force Sync Refresh">
-                  <RefreshCw className="w-4 h-4" />
-               </button>
-               <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest leading-none">
-                {words.filter(w => w.syncStatus === 'synced').length} synced / {words.length} total
-              </p>
-             </div>
-             <span className="text-xs font-bold text-stone-500 bg-stone-100 px-3 py-1.5 rounded-full uppercase tracking-tighter">
-                {filteredWords.length} results
-             </span>
+      <div className="max-w-[860px] mx-auto relative space-y-6">
+        {/* Header */}
+        <div className="flex items-baseline justify-between gap-4">
+          <h2 className="font-serif font-medium text-4xl tracking-[-0.02em] text-stone-900">Notebook</h2>
+          <div className="flex items-center gap-2">
+            <button onClick={() => window.location.reload()} className="p-2 text-[#B5AFA3] hover:text-stone-900 transition-colors" title="Force sync refresh">
+              <RefreshCw className="w-4 h-4" />
+            </button>
+            <span className="font-serif italic text-[15px] text-[#8C8880]">{words.length.toLocaleString()} {words.length === 1 ? 'word' : 'words'}</span>
           </div>
         </div>
-        
-        {/* Word List */}
-        <div className="divide-y divide-stone-100 min-h-[400px]">
+
+        <div className="flex items-center gap-3 border-b border-[#D9D3C7] focus-within:border-stone-900 transition-colors px-0.5 pb-2.5">
+          <Search className="w-[17px] h-[17px] text-[#8C8880] shrink-0" />
+          <label htmlFor="nb-search" className="sr-only">Search your words</label>
+          <input
+            id="nb-search"
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search your words…"
+            className="flex-1 min-w-0 bg-transparent outline-none font-serif text-lg text-stone-900 placeholder:text-[#B5AFA3]"
+          />
+          {searchQuery && <span className="text-xs text-[#8C8880] shrink-0">{filteredWords.length} found</span>}
+        </div>
+
+        <div role="group" aria-label="Filter" className="flex flex-wrap gap-1.5">
+          {filterChip('all', 'All')}
+          {filterChip('sentences', 'With my sentences', withSentences)}
+          {filterChip('due', 'Due today', dueCount)}
+        </div>
+
+        {/* Word list */}
+        <div className="bg-white border border-[#EDE8DE] rounded-[22px] p-2 min-h-[300px]">
           {filteredWords.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-stone-400 animate-fade-in">
-               <Search className="w-10 h-10 mb-4 opacity-10" />
-               <p className="text-sm font-medium">No results found for "{searchQuery}"</p>
+            <div className="flex flex-col items-center justify-center py-20 text-[#8C8880] animate-fade-in">
+              <Search className="w-10 h-10 mb-4 opacity-10" />
+              <p className="text-sm">{searchQuery ? `No words match “${searchQuery}”` : 'Nothing here yet.'}</p>
             </div>
           ) : (
             filteredWords.slice(0, visibleCount).map((entry) => {
               const isExpanded = expandedWords.has(entry.word);
+              const nSent = entry.contexts?.length ?? 0;
+              const first = entry.meanings[0]?.definitions[0]?.definition;
+              const isDue = !!entry.srs && srsService.isDue(entry);
               return (
-                <div key={entry.word} className={`bg-white transition-all duration-300 ${isExpanded ? 'my-4 rounded-xl shadow-lg border border-stone-100' : 'hover:bg-stone-50/50'}`}>
-                  <div onClick={() => toggleWord(entry.word)} className="p-4 sm:p-6 cursor-pointer flex justify-between items-center gap-2">
-                    <div className="flex-grow min-w-0">
-                      <div className="flex items-center gap-2 sm:gap-4 mb-2">
-                        <h3 className="text-xl sm:text-2xl font-serif font-bold text-stone-900 capitalize break-words min-w-0">{entry.word}</h3>
-                        <button onClick={(e) => { e.stopPropagation(); playPronunciation(entry.word); }} className="p-1.5 text-stone-400 hover:text-stone-900 hover:bg-stone-200/50 rounded-full transition-all shrink-0">
-                          <Volume2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                      <div className="flex items-center flex-wrap gap-2">
-                        <span className="text-sm text-stone-400 font-mono tracking-wide opacity-70 mr-2">{ipaLabel(entry.ipa)}</span>
-                        <span
-                          title={`Mastery: ${MASTERY_META[srsService.masteryLevel(entry)].label}`}
-                          className="text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-full border bg-amber-50/60 text-amber-700 border-amber-100"
-                        >
-                          {MASTERY_META[srsService.masteryLevel(entry)].icon} {MASTERY_META[srsService.masteryLevel(entry)].label}
-                        </span>
-                        {entry.meanings.map((m, i) => (
-                             <span key={i} className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-full border ${isFinance(m.partOfSpeech) ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-stone-50 text-stone-500 border-stone-100'}`}>
-                                  {m.partOfSpeech}
-                              </span>
-                        ))}
-                      </div>
-                    </div>
-                    <ChevronDown className={`w-5 h-5 text-stone-400 transition-transform duration-300 shrink-0 ${isExpanded ? 'rotate-180' : ''}`} />
-                  </div>
+                <div key={entry.word} className={`rounded-[14px] transition-colors ${isExpanded ? 'bg-[#FBF9F4] my-1' : ''}`}>
+                  <button onClick={() => toggleWord(entry.word)} aria-expanded={isExpanded} className="w-full text-left flex items-center gap-3 min-h-[60px] px-4 py-2.5 rounded-[14px] hover:bg-[#FBF9F4] transition-colors">
+                    <span className="flex-1 min-w-0 flex flex-col gap-0.5">
+                      <span className="font-serif text-[21px] text-stone-900 break-words">{entry.word}</span>
+                      {!isExpanded && first && <span className="text-[13px] text-[#6B675F] truncate">{first}</span>}
+                    </span>
+                    {nSent > 0 && <span className="font-serif italic text-[13px] text-[#9A5420] shrink-0">{nSent} {nSent === 1 ? 'sentence' : 'sentences'}</span>}
+                    {isDue && <span className="text-xs text-[#8C8880] shrink-0">due</span>}
+                    <ChevronDown className={`w-4 h-4 text-[#B5AFA3] transition-transform duration-300 shrink-0 ${isExpanded ? 'rotate-180' : ''}`} />
+                  </button>
 
                   {isExpanded && (
-                    <div className="px-4 pb-5 sm:px-6 sm:pb-6 border-t border-stone-50 pt-6 animate-fade-in">
-                      {/* Definitions Rendering */}
-                      <div className="space-y-8">
-                          {entry.meanings.map((meaning, idx) => {
-                              const isFinancial = isFinance(meaning.partOfSpeech);
-                              return (
-                                <div key={idx} className={`relative space-y-6 ${isFinancial ? 'p-4 pb-8 sm:p-6 sm:pb-10 border border-stone-100 rounded-2xl' : ''}`}>
-                                    {/* LEFT ACCENT BAR IS NOW GREY */}
-                                    {isFinancial && <div className="absolute left-0 top-8 bottom-8 w-1 bg-stone-300 rounded-r-full" />}
-                                    
-                                    <div className="flex items-center gap-6 mb-2">
-                                        <div className="flex items-center gap-2">
-                                          {/* HEADER REMAINS GREEN */}
-                                          {isFinancial && <TrendingUp className="w-3 h-3 text-emerald-500" />}
-                                          <span className={`text-[10px] font-bold uppercase tracking-[0.3em] block ${isFinancial ? 'text-emerald-600' : 'text-stone-400'}`}>
-                                              {meaning.partOfSpeech}
-                                          </span>
-                                        </div>
-                                        <div className={`h-[1px] flex-grow ${isFinancial ? 'bg-stone-100' : 'bg-stone-100'}`} />
-                                    </div>
-                                    
-                                    {meaning.definitions.map((def, defIdx) => (
-                                        <div key={defIdx} className={`space-y-4 ${isFinancial ? 'pl-2' : 'pl-4 border-l border-stone-200'}`}>
-                                            <p className={`font-serif text-xl sm:text-2xl leading-tight font-bold tracking-tight text-stone-900 break-words`}>
-                                                {def.definition}
-                                            </p>
-                                            {def.gloss && (
-                                                <p className="gloss leading-snug -mt-2">{def.gloss}</p>
-                                            )}
+                    <div className="px-4 sm:px-6 pb-6 pt-2 space-y-7 animate-fade-in">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span className="font-mono text-sm text-[#6B675F]">{ipaLabel(entry.ipa)}</span>
+                        <button onClick={() => playPronunciation(entry.word)} className="flex items-center gap-1.5 min-h-[34px] px-3 rounded-full border border-[#E2DDD2] text-[13px] text-[#2B2A27] hover:border-stone-900 transition-colors">
+                          <Volume2 className="w-3.5 h-3.5" /> Listen
+                        </button>
+                        <span className="text-xs text-[#8C8880]">{MASTERY_META[srsService.masteryLevel(entry)].label}</span>
+                        {onOpenWord && (
+                          <button onClick={() => onOpenWord(entry.word)} className="ml-auto flex items-center gap-1.5 min-h-[36px] text-[13.5px] font-medium text-stone-900 border-b border-[#D9D3C7] hover:border-stone-900">
+                            Full definition <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
 
-                                            {def.synonyms && def.synonyms.length > 0 && (
-                                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
-                                                  <div className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest mr-1 text-stone-400`}>
-                                                    <Tag className="w-3 h-3" /> Synonyms
-                                                  </div>
-                                                  <div className="flex flex-wrap gap-1.5">
-                                                    {def.synonyms.map((syn, si) => (
-                                                      <span key={si} className={`text-sm text-stone-600`}>
-                                                        {syn}{si < def.synonyms.length - 1 ? ',' : ''}
-                                                      </span>
-                                                    ))}
-                                                  </div>
-                                                </div>
-                                            )}
+                      {/* From your reading */}
+                      <section className="space-y-3">
+                        <div className="flex items-center gap-4">
+                          <h4 className="lx-label !text-[#9A5420]">From your reading</h4>
+                          <span aria-hidden="true" className="flex-1 h-px bg-[#EDE8DE]" />
+                          <button onClick={() => { setAddingContextFor(entry.word); setErrorMsg(''); }} className="text-xs text-[#55524C] hover:text-stone-900 flex items-center gap-1 min-h-[32px]">
+                            <Plus className="w-3 h-3" /> Add a passage
+                          </button>
+                        </div>
 
-                                            <div className="space-y-2">
-                                              {def.examples?.map((ex, ei) => (
-                                                <p key={ei} className={`italic font-serif text-lg leading-relaxed text-stone-500 border-l pl-4 ${isFinancial ? 'border-stone-100 py-1' : 'border-stone-50'}`}>
-                                                  "{ex}"
-                                                </p>
-                                              ))}
-                                            </div>
+                        {addingContextFor === entry.word && (
+                          <div className="bg-white p-4 rounded-2xl border border-[#EDE8DE] animate-fade-in space-y-3">
+                            <input type="text" placeholder="Source — optional (e.g. Bloomberg)" value={newContextTitle} onChange={(e) => setNewContextTitle(e.target.value)} className="w-full p-3 text-sm border border-[#E2DDD2] rounded-xl outline-none focus:border-stone-900" />
+                            <textarea placeholder={`Paste the passage containing “${entry.word}”…`} value={newContextText} onChange={(e) => setNewContextText(e.target.value)} className="w-full h-28 p-3 border border-[#E2DDD2] rounded-xl outline-none focus:border-stone-900 resize-none font-serif text-[15px] text-[#2B2A27]" />
+                            {errorMsg && <p className="text-sm text-amber-700">{errorMsg}</p>}
+                            <div className="flex justify-end gap-2">
+                              <button onClick={() => { setAddingContextFor(null); setErrorMsg(''); }} className="px-3 min-h-[36px] text-sm text-[#55524C]">Cancel</button>
+                              <button onClick={() => handleSaveContext(entry)} disabled={isAnalyzing || !newContextText} className="px-4 min-h-[36px] bg-stone-900 text-[#FBF9F4] text-sm rounded-full hover:bg-black disabled:opacity-50 flex items-center gap-2">
+                                {isAnalyzing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
 
-                                            {def.collocations && def.collocations.length > 0 && (
-                                              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pt-4">
-                                                <div className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest mr-1 text-stone-400`}>
-                                                  <Layers className="w-3 h-3" /> Collocations
-                                                </div>
-                                                <div className="flex flex-wrap gap-2">
-                                                  {def.collocations.map((col, ci) => (
-                                                    <span key={ci} className={`text-[10px] font-bold px-3 py-1 rounded-lg border text-stone-700 bg-stone-50 border-stone-200`}>
-                                                      {col}
-                                                    </span>
-                                                  ))}
-                                                </div>
-                                              </div>
-                                            )}
-                                        </div>
-                                    ))}
+                        {nSent === 0 && addingContextFor !== entry.word && (
+                          <p className="font-serif italic text-sm text-[#8C8880]">No sentences yet — paste one in Look up › Sentence and save it.</p>
+                        )}
+
+                        {entry.contexts?.map((ctx) => {
+                          const sense = senseOf(entry, ctx);
+                          return (
+                            <figure key={ctx.id} className="m-0 bg-[#FBF7EC] border border-[#EFE3C4] rounded-2xl px-5 py-4 space-y-3">
+                              <blockquote className="font-serif text-lg sm:text-xl leading-normal text-stone-900">{markWord(ctx.targetSentence, entry.word)}</blockquote>
+                              {(sense || ctx.explanation) && (
+                                <div className="grid grid-cols-[30px_minmax(0,1fr)] gap-x-1 border-t border-[#EFE3C4] pt-3">
+                                  <span aria-hidden="true" className="font-serif italic text-[#B5AFA3]">{sense ? `${sense.label}.` : ''}</span>
+                                  <div className="space-y-1">
+                                    <p className="font-serif text-base leading-snug text-stone-900">{sense?.def.definition || ctx.explanation}</p>
+                                    {sense?.def.gloss && <p className="gloss !text-sm">{sense.def.gloss}</p>}
+                                  </div>
                                 </div>
-                              );
-                          })}
-                      </div>
+                              )}
+                              <figcaption className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#8C8880]">
+                                <span>{ctx.sourceTitle} · {new Date(ctx.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                                <button onClick={() => setSidebarContext({ word: entry, context: ctx })} className="flex items-center gap-1 text-[#55524C] hover:text-stone-900 min-h-[28px]">
+                                  <Sparkles className="w-3 h-3" /> Ask about this
+                                </button>
+                                <button onClick={() => handleDeleteContext(entry, ctx.id)} className="hover:text-red-600 min-h-[28px]">Remove</button>
+                              </figcaption>
+                            </figure>
+                          );
+                        })}
+                      </section>
 
-                      {/* Contexts Section */}
-                      <div className="mt-8 pt-6 border-t border-stone-100">
-                          <div className="flex items-center justify-between mb-4">
-                            <h4 className="text-sm font-bold uppercase tracking-wider text-stone-400 flex items-center gap-2">
-                                <FileText className="w-4 h-4" /> Usage Contexts
-                            </h4>
-                            <button onClick={() => { setAddingContextFor(entry.word); setErrorMsg(''); }} className="text-xs text-stone-500 hover:text-stone-900 font-medium transition-colors flex items-center gap-1">
-                                <Plus className="w-3 h-3" /> Add Article
-                            </button>
+                      {/* Senses, compact */}
+                      {entry.meanings.map((meaning, mi) => (
+                        <section key={mi} className="space-y-4">
+                          <div className="flex items-center gap-4">
+                            <h4 className="font-serif italic text-lg text-[#2B2A27] first-letter:lowercase">{meaning.partOfSpeech}</h4>
+                            <span aria-hidden="true" className="flex-1 h-px bg-[#EDE8DE]" />
                           </div>
-
-                          {addingContextFor === entry.word && (
-                              <div className="bg-stone-50 p-4 rounded-xl border border-stone-200 mb-6 animate-fade-in shadow-inner">
-                                  <h5 className="font-serif font-bold text-stone-800 mb-3 text-lg">New Article Context</h5>
-                                  <input type="text" placeholder="Title — optional (e.g., Bloomberg News)" value={newContextTitle} onChange={(e) => setNewContextTitle(e.target.value)} className="w-full mb-3 p-3 text-sm border border-stone-200 rounded-lg outline-none focus:ring-1 focus:ring-stone-300" />
-                                  <textarea placeholder={`Paste text containing "${entry.word}"...`} value={newContextText} onChange={(e) => setNewContextText(e.target.value)} className="w-full h-32 p-3 text-sm border border-stone-200 rounded-lg outline-none focus:ring-1 focus:ring-stone-300 resize-none font-serif text-stone-600" />
-                                  {errorMsg && <p className="text-sm text-amber-700 mt-2">{errorMsg}</p>}
-                                  <div className="flex justify-end gap-2 mt-3">
-                                      <button onClick={() => { setAddingContextFor(null); setErrorMsg(''); }} className="px-3 py-1.5 text-xs font-medium text-stone-500">Cancel</button>
-                                      <button onClick={() => handleSaveContext(entry)} disabled={isAnalyzing || !newContextText} className="px-4 py-1.5 bg-stone-900 text-white text-xs font-bold uppercase tracking-widest rounded-lg hover:bg-black disabled:opacity-50 flex items-center gap-2">
-                                          {isAnalyzing ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Analyze & Save'}
-                                      </button>
-                                  </div>
+                          {meaning.definitions.map((def, di) => (
+                            <div key={di} className="grid grid-cols-[30px_minmax(0,1fr)] gap-x-1">
+                              <span aria-hidden="true" className="font-serif italic text-[#B5AFA3] leading-[1.45]">{ROMAN[di] ?? di + 1}.</span>
+                              <div className="space-y-2 min-w-0">
+                                <p className="font-serif text-lg leading-snug font-medium text-stone-900 break-words">{def.definition}</p>
+                                {def.gloss && <p className="gloss !text-[15px]">{def.gloss}</p>}
+                                {def.examples?.[0] && (
+                                  <p className="font-serif italic text-base leading-relaxed text-[#6B675F] pl-4 border-l border-[#EDE8DE]">“{def.examples[0].replace(/^["“]|["”]$/g, '')}”</p>
+                                )}
                               </div>
-                          )}
+                            </div>
+                          ))}
+                        </section>
+                      ))}
 
-                          <div className="space-y-4">
-                              {entry.contexts?.map((ctx) => (
-                                  <div key={ctx.id} className="bg-white border border-stone-100 rounded-xl overflow-hidden shadow-sm relative group p-5 hover:border-stone-300 transition-all">
-                                      <div className="flex justify-between items-start mb-3">
-                                          <h5 className="font-serif font-bold text-stone-800 text-lg leading-tight">{ctx.sourceTitle}</h5>
-                                          <button onClick={() => setSidebarContext({ word: entry, context: ctx })} className={`flex items-center gap-2 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] rounded-full shadow-lg transition-all active:scale-95 ${sidebarContext?.context.id === ctx.id ? 'bg-stone-100 text-stone-900 border border-stone-300' : 'bg-stone-900 text-white hover:bg-black'}`}>
-                                              <Sparkles className="w-3 h-3" /> {sidebarContext?.context.id === ctx.id ? 'Active Assist' : 'Assist'}
-                                          </button>
-                                      </div>
-                                      <p className="text-stone-600 font-serif italic text-sm border-l-2 border-stone-100 pl-3 py-1 mb-2">"{ctx.targetSentence}"</p>
-                                      <button onClick={() => handleDeleteContext(entry, ctx.id)} className="text-[10px] text-stone-300 hover:text-red-500 uppercase font-bold tracking-widest">Remove Context</button>
-                                  </div>
-                              ))}
-                          </div>
-                      </div>
-
-                      <div className="mt-8 pt-4 flex justify-between items-center border-t border-stone-100">
-                        <button onClick={(e) => { e.stopPropagation(); onDelete(entry.word); }} className="text-stone-300 hover:text-red-600 text-[10px] font-bold uppercase tracking-widest transition-colors">Delete Word</button>
+                      <div className="pt-2 flex justify-end">
+                        <button onClick={() => onDelete(entry.word)} className="text-xs text-[#B5AFA3] hover:text-red-600 transition-colors flex items-center gap-1.5 min-h-[32px]">
+                          <Trash2 className="w-3.5 h-3.5" /> Delete word
+                        </button>
                       </div>
                     </div>
                   )}
@@ -408,10 +402,10 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onUpdateWor
         </div>
 
         {filteredWords.length > visibleCount && (
-          <div className="text-center py-8">
+          <div className="text-center py-4">
             <button
               onClick={() => setVisibleCount(n => n + 200)}
-              className="px-6 py-3 bg-stone-100 text-stone-700 rounded-full text-sm font-bold hover:bg-stone-200 transition-colors"
+              className="min-h-[44px] px-6 rounded-full border border-[#E2DDD2] text-sm text-[#2B2A27] hover:border-stone-900 transition-colors"
             >
               Show more ({filteredWords.length - visibleCount} remaining)
             </button>
