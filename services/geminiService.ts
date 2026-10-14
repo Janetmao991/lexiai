@@ -833,3 +833,31 @@ ${senses.map((s, i) => `${i + 1}. ${s.text}`).join('\n')}`,
   const hit = senses[n - 1];
   return hit ? { meaning: hit.mi, definition: hit.di } : null;
 };
+
+/** Which sense each sentence uses — one call for a batch (e.g. podcast clips). null = no clear match. */
+export const tagSenses = async (entry: WordEntry, sentences: string[]): Promise<({ meaning: number; definition: number } | null)[]> => {
+  const senses = entry.meanings.flatMap((m, mi) =>
+    m.definitions.map((d, di) => ({ mi, di, text: `${m.partOfSpeech}: ${d.definition}` })));
+  if (senses.length === 0 || sentences.length === 0) return sentences.map(() => null);
+  if (senses.length === 1) return sentences.map(() => ({ meaning: 0, definition: 0 }));
+  const ai = getAi();
+  const response = await generateWithRetry(ai, {
+    model: getTextModel(),
+    contents: `Senses of "${entry.word}":
+${senses.map((s, i) => `${i + 1}. ${s.text}`).join('\n')}
+
+For each sentence below, give the number of the sense "${entry.word}" has in it (0 if none fits).
+${sentences.map((s, i) => `[${i + 1}] ${s}`).join('\n')}`,
+    config: {
+      thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
+      responseMimeType: "application/json",
+      responseSchema: { type: Type.OBJECT, properties: { senses: { type: Type.ARRAY, items: { type: Type.NUMBER } } }, required: ["senses"] },
+      temperature: 0,
+    },
+  });
+  const picks: number[] = response.text ? JSON.parse(response.text).senses || [] : [];
+  return sentences.map((_, i) => {
+    const hit = senses[(picks[i] ?? 0) - 1];
+    return hit ? { meaning: hit.mi, definition: hit.di } : null;
+  });
+};

@@ -4,6 +4,8 @@ import { lookupWord, playPronunciation, compareSynonyms, explainInContext, pickS
 import { ipaLabel } from '../services/format';
 import { Search, Volume2, Loader2, GitCompare, Sparkles, Check, Save, Bookmark, ArrowRight, ArrowLeft } from 'lucide-react';
 import { DailyRead } from './DailyRead';
+import { PodcastClips } from './PodcastClips';
+import { PodcastClip, formatTime } from '../services/podcastService';
 
 interface DictionaryProps {
   onSave: (word: WordEntry) => void;
@@ -182,6 +184,26 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
     }
   };
 
+  /** Save the looked-up word with a podcast line as one of its sentences. */
+  const saveClip = (clip: PodcastClip, sense: { meaning: number; definition: number } | null) => {
+    if (!lookupResult) return;
+    const entry = savedEntry(lookupResult.word) ?? lookupResult;
+    const ctx: UserContext = {
+      id: Date.now().toString(),
+      sourceTitle: `${clip.show} · ${formatTime(clip.start)}`,
+      fullText: clip.text,
+      targetSentence: clip.text,
+      explanation: sense ? entry.meanings[sense.meaning]?.definitions[sense.definition]?.definition ?? '' : '',
+      usageNuance: `Heard in “${clip.episode}”`,
+      timestamp: Date.now(),
+      ...(sense ? { sense } : {}),
+    };
+    const others = (entry.contexts || []).filter(c => normalizeForm(c.targetSentence) !== normalizeForm(clip.text));
+    const updated = { ...entry, contexts: [...others, ctx] };
+    onSave(updated);
+    setLookupResult(updated);
+  };
+
   const handleCompare = async (e: React.FormEvent) => {
     e.preventDefault();
     const words = compareInputs.filter(w => w.trim().length > 0);
@@ -263,7 +285,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
             <figure key={c.id} className="m-0 bg-[#FBF7EC] border border-[#EFE3C4] rounded-2xl px-5 py-4 space-y-2">
               <figcaption className="lx-label !text-[#9A5420]">From your reading</figcaption>
               <blockquote className="font-serif text-lg sm:text-xl leading-normal text-stone-900">{emphasizeMark(c.targetSentence, entry.word)}</blockquote>
-              <p className="text-xs text-[#8C8880]">Saved {new Date(c.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</p>
+              <p className="text-xs text-[#8C8880]">{c.sourceTitle !== 'From your reading' && `${c.sourceTitle} · `}Saved {new Date(c.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</p>
             </figure>
           ))}
         </div>
@@ -432,6 +454,12 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
                   ))}
                 </div>
               ))}
+
+              <PodcastClips
+                entry={lookupResult}
+                savedSentences={(lookupResult.contexts || []).map(c => c.targetSentence)}
+                onSaveClip={saveClip}
+              />
 
               {unassigned.length > 0 && (
                 <div className="space-y-3 pt-2">
