@@ -1,14 +1,15 @@
 #!/bin/zsh
-# Nightly (launchd: com.janet.lexiai-podcast): pick up new episodes, then upload to Supabase.
-# While backfill.sh is still running it owns transcription, so only the upload runs.
+# Nightly (launchd: com.janet.lexiai-podcast): add one archive episode per everyday show,
+# rebuild the example library (also picks up phrases newly saved to the notebook) and
+# sync the changes to Supabase. While backfill.sh runs it owns transcription and syncing.
 # Log: data/nightly.log
 export PATH="/opt/homebrew/bin:$HOME/.local/bin:/usr/bin:/bin:$PATH"
 cd "$(dirname "$0")"
 echo "=== nightly — $(date)"
-if pgrep -f "podcast/backfill.sh|\./backfill.sh" > /dev/null; then
-  echo "backfill still running — skipping transcription"
-else
-  caffeinate -i python3 ingest.py --kind everyday --per-show 3
-  caffeinate -i python3 ingest.py --kind work --per-show 2
+if pgrep -f "backfill.sh" > /dev/null; then
+  echo "backfill running — nothing to do"
+  exit 0
 fi
-python3 sync_supabase.py
+caffeinate -i python3 ingest.py --kind everyday --spread --add 1
+.venv/bin/python build_examples.py --phrases-from-notebook
+python3 sync_examples.py

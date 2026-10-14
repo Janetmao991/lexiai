@@ -79,11 +79,28 @@ def sentences(result):
             yield s[0]["start"], s[-1]["end"], text
 
 
+def spread_order(n):
+    """Indices 0..n-1 in an order that keeps spreading out: 0, n/2, n/4, 3n/4, n/8, …"""
+    seen, order, k = set(), [], 0
+    while len(order) < n and k < 4 * n:
+        k += 1
+        f, denom, i = 0.0, 1.0, k - 1
+        while i:  # van der Corput sequence in base 2
+            denom *= 2; f += (i & 1) / denom; i >>= 1
+        idx = min(n - 1, int(f * n))
+        if idx not in seen:
+            seen.add(idx); order.append(idx)
+    return order + [i for i in range(n) if i not in seen]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--per-show", type=int, default=2)
     ap.add_argument("--show", help="substring filter on show name")
     ap.add_argument("--kind", help="only shows of this kind (everyday | work)")
+    ap.add_argument("--spread", action="store_true",
+                    help="pick episodes evenly across the whole back catalog instead of newest first")
+    ap.add_argument("--add", type=int, default=0, help="index N more episodes per show (overrides --per-show)")
     args = ap.parse_args()
     shows = json.load(open(os.path.join(HERE, "shows.json")))["shows"]
     if args.kind:
@@ -96,12 +113,17 @@ def main():
             items = list(feed_items(show["feed"]))
         except Exception as e:
             print(f"! {show['name']}: feed failed ({e})"); continue
-        done = 0
-        for ep in items:
-            if done >= args.per_show:
+        # Target = total indexed episodes for this show. For word examples recency doesn't
+        # matter, so --spread samples the whole archive for more varied topics and guests.
+        done = con.execute("SELECT count(*) FROM episodes WHERE show=?", (show["name"],)).fetchone()[0]
+        target = done + args.add if args.add else args.per_show
+        order = spread_order(len(items)) if args.spread else range(len(items))
+        for idx in order:
+            ep = items[idx]
+            if done >= target:
                 break
             if con.execute("SELECT 1 FROM episodes WHERE audio_url=?", (ep["audio_url"],)).fetchone():
-                done += 1; continue
+                continue
             print(f"→ {show['name']} — {ep['title'][:70]}", flush=True)
             try:
                 result = transcribe(ep["audio_url"])
