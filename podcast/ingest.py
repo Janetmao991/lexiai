@@ -79,6 +79,77 @@ def sentences(result):
             yield s[0]["start"], s[-1]["end"], text
 
 
+DIG_POOL = os.path.expanduser(
+    "~/Library/Mobile Documents/iCloud~md~obsidian/Documents/Janet's brain/Janet's AI Brain/Podcast Research/podcast-pool.json")
+
+
+def title_key(t):
+    return re.sub(r"[^a-z0-9]", "", (t or "").lower())[:60]
+
+
+def show_key(s):
+    return re.sub(r"[^a-z0-9]", "", (s or "").lower())[:8]
+
+
+def dig_transcript(show, title):
+    """Sentences from podcast-dig's own Whisper transcript of this episode, if it has one —
+    so the same episode is never transcribed twice. Paragraph timestamps ([mm:ss]) are
+    spread over the paragraph's sentences by word position."""
+    if not os.path.exists(DIG_POOL):
+        return None
+    vault = os.path.dirname(os.path.dirname(DIG_POOL))
+    for e in json.load(open(DIG_POOL)).get("episodes", []):
+        if e.get("transcript_source") != "whisper-local" or not e.get("transcript_file"):
+            continue
+        if title_key(e.get("episode_title")) != title_key(title) or show_key(e.get("show")) != show_key(show):
+            continue
+        path = os.path.join(vault, e["transcript_file"])
+        if not os.path.exists(path):
+            continue
+        body = open(path, encoding="utf-8").read().split("## Transcript", 1)[-1]
+        paras = []
+        for m in re.finditer(r"^\[(\d+(?::\d{2}){1,2})\]\s*(.+)$", body, re.M):
+            secs = 0
+            for part in m.group(1).split(":"):
+                secs = secs * 60 + int(part)
+            text = re.sub(r"==|★|\[定位\]|\*\*[^*]+:\*\*|<!--.*?-->", "", m.group(2)).strip()
+            if text:
+                paras.append((secs, text))
+        out = []
+        for i, (t0, text) in enumerate(paras):
+            t1 = paras[i + 1][0] if i + 1 < len(paras) else t0 + 30
+            sents = [x.strip() for x in re.split(r"(?<=[.?!])\s+", text) if x.strip()]
+            total = sum(len(x.split()) for x in sents) or 1
+            seen = 0
+            for x in sents:
+                n = len(x.split())
+                start = t0 + (t1 - t0) * seen / total
+                seen += n
+                if n >= 4:
+                    out.append((start, t0 + (t1 - t0) * seen / total, x))
+        return out or None
+    return None
+
+
+def index_episode(con, show_name, kind, ep):
+    """Add one episode to the corpus: reuse podcast-dig's transcript if it has one, else Whisper."""
+    sents = dig_transcript(show_name, ep["title"])
+    if sents:
+        print("  ↺ reusing podcast-dig's Whisper transcript", flush=True)
+    else:
+        sents = list(sentences(transcribe(ep["audio_url"])))
+    dur = sents[-1][1] if sents else 0
+    cur = con.execute("INSERT INTO episodes(show,kind,title,published,audio_url,link,duration) VALUES(?,?,?,?,?,?,?)",
+                      (show_name, kind, ep["title"], ep.get("published", ""), ep["audio_url"], ep.get("link", ""), dur))
+    for start, end, text in sents:
+        sid = con.execute("INSERT INTO sentences(episode_id,start,end,text) VALUES(?,?,?,?)",
+                          (cur.lastrowid, start, end, text)).lastrowid
+        con.execute("INSERT INTO sentences_fts(rowid,text) VALUES(?,?)", (sid, text))
+    con.commit()
+    print(f"  ✓ {len(sents)} sentences, {dur/60:.0f} min", flush=True)
+    return cur.lastrowid
+
+
 def spread_order(n):
     """Indices 0..n-1 in an order that keeps spreading out: 0, n/2, n/4, 3n/4, n/8, …"""
     seen, order, k = set(), [], 0
@@ -101,7 +172,20 @@ def main():
     ap.add_argument("--spread", action="store_true",
                     help="pick episodes evenly across the whole back catalog instead of newest first")
     ap.add_argument("--add", type=int, default=0, help="index N more episodes per show (overrides --per-show)")
+    # Single-episode mode (used by podcast-dig): index exactly this episode.
+    ap.add_argument("--audio-url", help="index one episode by its enclosure URL (needs --title, --show-name)")
+    ap.add_argument("--title")
+    ap.add_argument("--show-name")
     args = ap.parse_args()
+    if args.audio_url:
+        con = db()
+        row = con.execute("SELECT id FROM episodes WHERE audio_url=?", (args.audio_url,)).fetchone()
+        if row:
+            print(f"already indexed: episode {row[0]}"); return
+        print(f"→ {args.show_name} — {(args.title or '')[:70]}", flush=True)
+        index_episode(con, args.show_name or "", args.kind or "work",
+                      {"title": args.title or "", "audio_url": args.audio_url})
+        return
     shows = json.load(open(os.path.join(HERE, "shows.json")))["shows"]
     if args.kind:
         shows = [s for s in shows if s["kind"] == args.kind]
@@ -126,19 +210,9 @@ def main():
                 continue
             print(f"→ {show['name']} — {ep['title'][:70]}", flush=True)
             try:
-                result = transcribe(ep["audio_url"])
+                index_episode(con, show["name"], show["kind"], ep)
             except Exception as e:
                 print(f"  ! transcription failed: {e}"); continue
-            sents = list(sentences(result))
-            dur = sents[-1][1] if sents else 0
-            cur = con.execute("INSERT INTO episodes(show,kind,title,published,audio_url,link,duration) VALUES(?,?,?,?,?,?,?)",
-                              (show["name"], show["kind"], ep["title"], ep["published"], ep["audio_url"], ep["link"], dur))
-            for start, end, text in sents:
-                sid = con.execute("INSERT INTO sentences(episode_id,start,end,text) VALUES(?,?,?,?)",
-                                  (cur.lastrowid, start, end, text)).lastrowid
-                con.execute("INSERT INTO sentences_fts(rowid,text) VALUES(?,?)", (sid, text))
-            con.commit()
-            print(f"  ✓ {len(sents)} sentences, {dur/60:.0f} min", flush=True)
             done += 1
 
 
