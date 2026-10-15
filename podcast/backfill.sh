@@ -30,3 +30,4 @@ for round in $(seq 1 $MAX_ROUNDS); do
   prev=$now
 done
 echo "=== backfill done — $(date)"
+touch data/backfill.done
