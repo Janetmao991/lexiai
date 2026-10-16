@@ -10,7 +10,7 @@ Uploaded state lives in data/clips.json. Run with the podcast venv (needs lemmin
 
 Usage: .venv/bin/python make_clips.py
 """
-import hashlib, json, os, shutil, sqlite3, subprocess, sys, tempfile
+import hashlib, json, os, shutil, sqlite3, subprocess, sys, tempfile, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
@@ -26,13 +26,16 @@ BUCKET = "podcast-clips"
 CLIPS_PER_WORD = 3
 MAX_SECS = 25
 BUDGET_MB = 800
+UPLOAD_BATCH = 100
 
 
 def storage(*args):
-    out = subprocess.run(["supabase", "storage", *args, "--linked", "--experimental"],
+    out = subprocess.run(["supabase", "storage", *args, "--linked", "--experimental", "--output-format", "json"],
                          cwd=REPO, capture_output=True, text=True, timeout=1800)
     if out.returncode != 0:
-        raise RuntimeError(out.stderr.strip()[-400:] or out.stdout.strip()[-400:])
+        problems = [l for l in (out.stderr + out.stdout).splitlines()
+                    if l.strip() and not l.startswith(("Uploading", "A new version", "We recommend"))]
+        raise RuntimeError(" | ".join(problems[-5:]) or f"exit {out.returncode}")
     return out.stdout
 
 
@@ -76,47 +79,67 @@ def main():
 
     # Drop clips whose line left the library or whose text changed (re-transcribed).
     stale = [k for k, (name, _b) in state.items() if wanted_names.get(int(k)) != name]
+    if state and len(stale) > 0.5 * len(state) and len(stale) > 50:
+        raise SystemExit(f"refusing to delete {len(stale)} of {len(state)} clips at once — check the inputs")
     if stale:
         for i in range(0, len(stale), 100):
             storage("rm", "--yes", *[f"ss:///{BUCKET}/{state[k][0]}" for k in stale[i:i + 100]])
         run_batched("update public.podcast_lines set clip_path = null where id in (", [str(int(k)) for k in stale], ");")
         for k in stale:
             state.pop(k)
+        json.dump(state, open(STATE, "w"))
 
     used = sum(b for _n, b in state.values())
     new = [i for i in wanted if str(i) not in state]
     print(f"clips: {len(state)} kept, {len(stale)} removed, {len(new)} to cut · {used / 1e6:.0f} MB used", flush=True)
     os.makedirs(CLIP_DIR, exist_ok=True)
-    # `storage cp -r <dir>` uploads under the directory's own name, so stage into ".../clips".
     stage_root = tempfile.mkdtemp(prefix="clips-")
-    staging = os.path.join(stage_root, "clips")
-    os.makedirs(staging)
-    added = {}
     try:
+        cut_ok = []
         for i in new:
             if used >= BUDGET_MB * 1e6:
                 print(f"! storage budget of {BUDGET_MB} MB reached — remaining lines stay text-only", flush=True)
                 break
             ep, s, e, t, cs, ce = lines[i]
-            dest = os.path.join(staging, os.path.basename(wanted_names[i]))
+            dest = os.path.join(CLIP_DIR, os.path.basename(wanted_names[i]))
             try:
                 cut(ep, s, e, cs, ce, dest)
             except subprocess.CalledProcessError:
                 continue
-            size = os.path.getsize(dest)
-            used += size
-            added[str(i)] = [wanted_names[i], size]
-        if added:
-            storage("cp", "-r", "-j", "8", "--content-type", "audio/mpeg", staging, f"ss:///{BUCKET}/")
+            used += os.path.getsize(dest)
+            cut_ok.append(i)
+        # Upload in batches; each batch is recorded as soon as it lands, so a failure loses nothing.
+        for b in range(0, len(cut_ok), UPLOAD_BATCH):
+            batch = cut_ok[b:b + UPLOAD_BATCH]
+            # `storage cp -r <dir>` uploads under the directory's own name, so stage into ".../clips".
+            staging = os.path.join(stage_root, "clips")
+            shutil.rmtree(staging, ignore_errors=True)
+            os.makedirs(staging)
+            for i in batch:
+                f = os.path.basename(wanted_names[i])
+                shutil.copy(os.path.join(CLIP_DIR, f), os.path.join(staging, f))
+            for attempt in range(3):
+                try:
+                    storage("cp", "-r", "-j", "2", "--content-type", "audio/mpeg", staging, f"ss:///{BUCKET}/")
+                    break
+                except RuntimeError as err:
+                    # The Free plan answers 429 "too many connections" to bursts — back off.
+                    print(f"  upload retry {attempt + 1}: {str(err)[:120]}", flush=True)
+                    time.sleep(30 * (attempt + 1))
+            else:
+                print("! upload failed three times — will retry next run", flush=True)
+                continue
             run_batched("update public.podcast_lines set clip_path = v.p from (values ",
-                        [f"({int(k)}, {q(name)})" for k, (name, _b) in added.items()],
+                        [f"({i}, {q(wanted_names[i])})" for i in batch],
                         ") as v(id, p) where podcast_lines.id = v.id;")
-            for f in os.listdir(staging):
-                shutil.move(os.path.join(staging, f), os.path.join(CLIP_DIR, f))
-            state.update(added)
+            for i in batch:
+                state[str(i)] = [wanted_names[i], os.path.getsize(os.path.join(CLIP_DIR, os.path.basename(wanted_names[i])))]
             json.dump(state, open(STATE, "w"))
+            print(f"  uploaded {b + len(batch)}/{len(cut_ok)}", flush=True)
+            time.sleep(3)
     finally:
         shutil.rmtree(stage_root, ignore_errors=True)
+        json.dump(state, open(STATE, "w"))
     print(f"clips: {len(state)} in bucket · {sum(b for _n, b in state.values()) / 1e6:.0f} MB", flush=True)
 
 

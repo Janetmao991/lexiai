@@ -66,7 +66,7 @@ def transcribe(audio_url, archive=None):
                 f.write(chunk)
         if archive:
             os.makedirs(os.path.dirname(archive), exist_ok=True)
-            subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", audio, "-ac", "1", "-ar", "16000",
+            subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", audio, "-vn", "-ac", "1", "-ar", "16000",
                             "-c:a", "libopus", "-b:a", "20k", "-f", "ogg", archive], check=True)
         subprocess.run(["mlx_whisper", audio, "--model", MODEL, "--language", "en",
                         "--word-timestamps", "True", "--output-format", "json",

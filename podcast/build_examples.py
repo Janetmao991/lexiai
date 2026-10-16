@@ -38,12 +38,14 @@ def lemmas(tok):
 
 def notebook_words():
     """Every headword in the LexiAI notebook (lower-cased), read through the Supabase CLI login."""
-    out = subprocess.run(["supabase", "db", "query", "--linked",
+    out = subprocess.run(["supabase", "db", "query", "--linked", "--output-format", "json",
                           "select distinct lower(word) as w from public.words"],
                          cwd=os.path.dirname(HERE), capture_output=True, text=True, timeout=120)
-    start = out.stdout.find("{")
-    rows = json.loads(out.stdout[start:]).get("rows", []) if start >= 0 else []
-    return [r["w"].strip() for r in rows if r["w"].strip()]
+    from sync_examples import parse_rows
+    words = [r["w"].strip() for r in parse_rows(out.stdout) if (r.get("w") or "").strip()]
+    if not words:
+        raise RuntimeError("could not read the notebook from Supabase")
+    return words
 
 
 def quality(text, kind):

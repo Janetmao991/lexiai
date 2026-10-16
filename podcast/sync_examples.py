@@ -23,14 +23,23 @@ def run_sql(sql):
         f.write(sql)
         path = f.name
     try:
-        out = subprocess.run(["supabase", "db", "query", "--linked", "-f", path],
+        out = subprocess.run(["supabase", "db", "query", "--linked", "--output-format", "json", "-f", path],
                              cwd=REPO, capture_output=True, text=True, timeout=300)
     finally:
         os.unlink(path)
     if out.returncode != 0:
         raise RuntimeError(out.stderr.strip()[-500:])
-    start = out.stdout.find("{")
-    return json.loads(out.stdout[start:]).get("rows", []) if start >= 0 else []
+    return parse_rows(out.stdout)
+
+
+def parse_rows(stdout):
+    """Rows from `supabase db query` JSON: a bare array (--output-format json) or, when the
+    CLI detects an agent, {"rows": [...]}. Anything else is an error, never silently empty."""
+    starts = [i for i in (stdout.find("["), stdout.find("{")) if i >= 0]
+    if not starts:
+        raise RuntimeError(f"unexpected supabase output: {stdout[:200]!r}")
+    data = json.loads(stdout[min(starts):])
+    return data if isinstance(data, list) else data.get("rows", [])
 
 
 def q(s):
