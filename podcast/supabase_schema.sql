@@ -72,3 +72,12 @@ $$;
 
 revoke all on function public.podcast_examples_for(text) from public, anon;
 grant execute on function public.podcast_examples_for(text) to authenticated;
+
+-- Own audio clips (podcast/make_clips.py): private bucket, signed-in users may read.
+insert into storage.buckets (id, name, public)
+values ('podcast-clips', 'podcast-clips', false)
+on conflict (id) do nothing;
+
+drop policy if exists "podcast clips: signed-in read" on storage.objects;
+create policy "podcast clips: signed-in read" on storage.objects
+  for select to authenticated using (bucket_id = 'podcast-clips');

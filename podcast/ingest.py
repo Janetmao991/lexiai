@@ -48,13 +48,26 @@ def feed_items(url):
                "audio_url": enc.get("url"), "link": item.findtext("link") or ""}
 
 
-def transcribe(audio_url):
+AUDIO_DIR = os.path.join(HERE, "data", "audio")
+
+
+def archive_path(episode_id):
+    """Low-bitrate copy of the exact audio an episode was transcribed from. Clips are cut
+    from it, because the publisher's live file carries different (dynamic) ads every time."""
+    return os.path.join(AUDIO_DIR, f"{episode_id}.opus")
+
+
+def transcribe(audio_url, archive=None):
     with tempfile.TemporaryDirectory() as tmp:
         audio = os.path.join(tmp, "ep.mp3")
         req = urllib.request.Request(audio_url, headers=UA)
         with urllib.request.urlopen(req, timeout=300) as r, open(audio, "wb") as f:
             while chunk := r.read(1 << 20):
                 f.write(chunk)
+        if archive:
+            os.makedirs(os.path.dirname(archive), exist_ok=True)
+            subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", audio, "-ac", "1", "-ar", "16000",
+                            "-c:a", "libopus", "-b:a", "20k", "-f", "ogg", archive], check=True)
         subprocess.run(["mlx_whisper", audio, "--model", MODEL, "--language", "en",
                         "--word-timestamps", "True", "--output-format", "json",
                         "--output-dir", tmp, "--output-name", "ep", "--verbose", "False"],
@@ -131,23 +144,34 @@ def dig_transcript(show, title):
     return None
 
 
-def index_episode(con, show_name, kind, ep):
-    """Add one episode to the corpus: reuse podcast-dig's transcript if it has one, else Whisper."""
-    sents = dig_transcript(show_name, ep["title"])
-    if sents:
-        print("  ↺ reusing podcast-dig's Whisper transcript", flush=True)
-    else:
-        sents = list(sentences(transcribe(ep["audio_url"])))
-    dur = sents[-1][1] if sents else 0
-    cur = con.execute("INSERT INTO episodes(show,kind,title,published,audio_url,link,duration) VALUES(?,?,?,?,?,?,?)",
-                      (show_name, kind, ep["title"], ep.get("published", ""), ep["audio_url"], ep.get("link", ""), dur))
+def write_sentences(con, episode_id, sents):
     for start, end, text in sents:
         sid = con.execute("INSERT INTO sentences(episode_id,start,end,text) VALUES(?,?,?,?)",
-                          (cur.lastrowid, start, end, text)).lastrowid
+                          (episode_id, start, end, text)).lastrowid
         con.execute("INSERT INTO sentences_fts(rowid,text) VALUES(?,?)", (sid, text))
+
+
+def index_episode(con, show_name, kind, ep):
+    """Add one episode to the corpus: reuse podcast-dig's transcript if it has one, else
+    Whisper — keeping an audio copy so clips line up with the transcript."""
+    cur = con.execute("INSERT INTO episodes(show,kind,title,published,audio_url,link,duration) VALUES(?,?,?,?,?,?,0)",
+                      (show_name, kind, ep["title"], ep.get("published", ""), ep["audio_url"], ep.get("link", "")))
+    eid = cur.lastrowid
+    try:
+        sents = dig_transcript(show_name, ep["title"])
+        if sents:
+            print("  ↺ reusing podcast-dig's Whisper transcript (no audio copy, so no clips)", flush=True)
+        else:
+            sents = list(sentences(transcribe(ep["audio_url"], archive=archive_path(eid))))
+    except Exception:
+        con.rollback()
+        raise
+    dur = sents[-1][1] if sents else 0
+    con.execute("UPDATE episodes SET duration=? WHERE id=?", (dur, eid))
+    write_sentences(con, eid, sents)
     con.commit()
     print(f"  ✓ {len(sents)} sentences, {dur/60:.0f} min", flush=True)
-    return cur.lastrowid
+    return eid
 
 
 def spread_order(n):
