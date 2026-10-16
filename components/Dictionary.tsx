@@ -3,7 +3,6 @@ import { WordEntry, SynonymComparison, ContextMeaning, UserContext } from '../ty
 import { lookupWord, playPronunciation, compareSynonyms, explainInContext, pickSense } from '../services/geminiService';
 import { ipaLabel } from '../services/format';
 import { Search, Volume2, Loader2, GitCompare, Sparkles, Check, Save, Bookmark, ArrowRight, ArrowLeft } from 'lucide-react';
-import { DailyRead } from './DailyRead';
 import { PodcastClips } from './PodcastClips';
 import { PodcastClip, formatTime } from '../services/podcastService';
 
@@ -696,7 +695,6 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
         </div>
       )}
 
-      {!IS_EMBED && activeMode !== 'COMPARE' && <DailyRead words={savedWords} />}
     </div>
   );
 };

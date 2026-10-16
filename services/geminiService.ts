@@ -709,41 +709,6 @@ export const transcribeAudio = async (base64Audio: string, mimeType: string): Pr
 
 // ---------- Daily Read: comprehensible input woven from review words ----------
 
-export interface DailyReadResult {
-  title: string;
-  passage: string;
-}
-
-const dailyReadSchema = {
-  type: Type.OBJECT,
-  properties: {
-    title: { type: Type.STRING },
-    passage: { type: Type.STRING },
-  },
-  required: ["title", "passage"],
-};
-
-export const generateDailyRead = async (targetWords: string[]): Promise<DailyReadResult> => {
-  const ai = getAi();
-  const response = await generateWithRetry(ai, {
-    model: getTextModel(),
-    contents: `Write a short, engaging passage (150-200 words) for an advanced English learner who follows business and finance news.
-
-Requirements:
-1. Naturally weave in ALL of these words/phrases exactly once each: ${targetWords.join(', ')}
-2. Pick a concrete, contemporary angle (a market story, a workplace scene, a consumer trend) — not a lecture about vocabulary.
-3. Sophisticated but readable prose; short paragraphs are fine.
-4. Also give it a punchy title (5-8 words). Do not use the target words in the title.`,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: dailyReadSchema,
-      thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
-      temperature: 0.9,
-    },
-  });
-  return JSON.parse(response.text!);
-};
-
 // ---- Meaning in context ----
 
 const contextMeaningSchema = (withGloss: boolean) => ({
