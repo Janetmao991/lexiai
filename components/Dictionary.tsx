@@ -191,7 +191,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
     const ctx: UserContext = {
       id: Date.now().toString(),
       sourceTitle: `${clip.show} · ${formatTime(clip.start)}`,
-      fullText: clip.text,
+      fullText: [clip.before, clip.text, clip.after].filter(Boolean).join(' '),
       targetSentence: clip.text,
       explanation: sense ? entry.meanings[sense.meaning]?.definitions[sense.definition]?.definition ?? '' : '',
       usageNuance: `Heard in “${clip.episode}”`,

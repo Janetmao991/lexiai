@@ -7,7 +7,7 @@ Refuses to grow the database past SIZE_LIMIT_MB (Free plan cap is 500 MB).
 
 Usage: python3 sync_examples.py
 """
-import json, os, sqlite3, subprocess, tempfile
+import hashlib, json, os, sqlite3, subprocess, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
@@ -56,20 +56,23 @@ def main():
     state = json.load(open(STATE)) if os.path.exists(STATE) else {"episodes": [], "lines": [], "examples": []}
     ex = sqlite3.connect(EXAMPLES)
     ex.execute(f"ATTACH '{CORPUS}' AS c")
-    lines = {i: (ep, s, e, t) for i, ep, s, e, t in ex.execute("SELECT id, episode_id, start, end, text FROM lines")}
+    lines = {i: (ep, s, e, t, b, a) for i, ep, s, e, t, b, a in
+             ex.execute("SELECT id, episode_id, start, end, text, before, after FROM lines")}
+    digest = {i: hashlib.md5(json.dumps(v).encode()).hexdigest()[:12] for i, v in lines.items()}
     examples = {(l, i): r for l, i, r in ex.execute("SELECT lemma, line_id, rank FROM examples")}
     episodes = {r[0]: r[1:] for r in ex.execute(
         "SELECT id, show, kind, title, published, audio_url, link FROM c.episodes "
         "WHERE id IN (SELECT DISTINCT episode_id FROM lines)")}
 
-    old_lines = set(state["lines"])
+    # Older state files stored only ids; treat those lines as changed so context gets filled in.
+    old_lines = state["lines"] if isinstance(state["lines"], dict) else {str(i): "" for i in state["lines"]}
     old_examples = {(l, i): r for l, i, r in state["examples"]}
     old_episodes = set(state["episodes"])
 
     gone_ex = [k for k in old_examples if k not in examples]
     new_ex = [k for k, r in examples.items() if old_examples.get(k) != r]
-    gone_lines = [i for i in old_lines if i not in lines]
-    new_lines = [i for i in lines if i not in old_lines]
+    gone_lines = [int(i) for i in old_lines if int(i) not in lines]
+    new_lines = [i for i in lines if old_lines.get(str(i)) != digest[i]]
     new_eps = [i for i in episodes if i not in old_episodes]
     print(f"examples +{len(new_ex)} −{len(gone_ex)} · lines +{len(new_lines)} −{len(gone_lines)} · episodes +{len(new_eps)}")
     if not (gone_ex or new_ex or gone_lines or new_lines or new_eps):
@@ -90,9 +93,12 @@ def main():
                      for i, (sh, k, t, p, u, lk) in episodes.items() if i in new_eps],
                     " on conflict (id) do nothing;")
     if new_lines:
-        run_batched("insert into public.podcast_lines (id, episode_id, start_s, end_s, text) values ",
-                    [f"({i}, {lines[i][0]}, {lines[i][1]:.2f}, {lines[i][2]:.2f}, {q(lines[i][3])})" for i in new_lines],
-                    " on conflict (id) do nothing;")
+        run_batched("insert into public.podcast_lines (id, episode_id, start_s, end_s, text, before_text, after_text) values ",
+                    [f"({i}, {lines[i][0]}, {lines[i][1]:.2f}, {lines[i][2]:.2f}, {q(lines[i][3])}, {q(lines[i][4])}, {q(lines[i][5])})"
+                     for i in new_lines],
+                    " on conflict (id) do update set episode_id = excluded.episode_id, start_s = excluded.start_s,"
+                    " end_s = excluded.end_s, text = excluded.text, before_text = excluded.before_text,"
+                    " after_text = excluded.after_text;")
     if new_ex:
         run_batched("insert into public.podcast_examples (lemma, line_id, rank) values ",
                     [f"({q(l)}, {i}, {examples[(l, i)]})" for l, i in new_ex],
@@ -101,7 +107,7 @@ def main():
     run_sql("delete from public.podcast_episodes e where not exists "
             "(select 1 from public.podcast_lines l where l.episode_id = e.id);")
 
-    json.dump({"episodes": sorted(episodes), "lines": sorted(lines),
+    json.dump({"episodes": sorted(episodes), "lines": {str(i): h for i, h in digest.items()},
                "examples": [[l, i, r] for (l, i), r in examples.items()]}, open(STATE, "w"))
     print(f"Synced. Database now {db_size_mb():.0f} MB.")
 

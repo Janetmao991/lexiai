@@ -105,10 +105,17 @@ def main():
         os.remove(OUT)
     out = sqlite3.connect(OUT)
     out.executescript("""
-      CREATE TABLE lines(id INTEGER PRIMARY KEY, episode_id INTEGER, start REAL, end REAL, text TEXT);
+      CREATE TABLE lines(id INTEGER PRIMARY KEY, episode_id INTEGER, start REAL, end REAL, text TEXT,
+                         before TEXT, after TEXT, ctx_start REAL, ctx_end REAL);
       CREATE TABLE examples(lemma TEXT, line_id INTEGER, rank INTEGER, PRIMARY KEY(lemma, line_id));""")
-    out.executemany("INSERT INTO lines VALUES (?,?,?,?,?)",
-                    [(sid, ep, s, e, t) for sid, ep, s, e, t, _k in rows if sid in keep])
+    # The sentence before and after each kept line, so a clip reads (and later plays) in context.
+    ctx = {sid: (b, a, bs, ae) for sid, b, a, bs, ae in con.execute("""
+      SELECT id, lag(text) OVER w, lead(text) OVER w, lag(start) OVER w, lead(end) OVER w
+      FROM sentences WINDOW w AS (PARTITION BY episode_id ORDER BY start)""") if sid in keep}
+    out.executemany("INSERT INTO lines VALUES (?,?,?,?,?,?,?,?,?)",
+                    [(sid, ep, s, e, t, ctx[sid][0], ctx[sid][1], ctx[sid][2] if ctx[sid][2] is not None else s,
+                      ctx[sid][3] if ctx[sid][3] is not None else e)
+                     for sid, ep, s, e, t, _k in rows if sid in keep])
     out.executemany("INSERT INTO examples VALUES (?,?,?)", examples)
     out.commit()
     print(f"{len(cands)} words · {len(examples)} examples · {len(keep)} lines kept of {len(rows)}")

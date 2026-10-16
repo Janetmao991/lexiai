@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { WordEntry } from '../types';
 import { supabase } from '../services/supabaseClient';
-import { searchClips, PodcastClip, formatTime, inflectionPattern } from '../services/podcastService';
+import { searchClips, PodcastClip, formatTime, inflectionPattern, clipUrl } from '../services/podcastService';
 import { tagSenses } from '../services/geminiService';
 import { Play, Pause, Loader2, Bookmark, Check } from 'lucide-react';
 
@@ -52,8 +52,9 @@ export const PodcastClips: React.FC<PodcastClipsProps> = ({ entry, savedSentence
     return () => { cancelled = true; audio.current?.pause(); };
   }, [entry.word]);
 
-  const toggle = (i: number) => {
+  const toggle = async (i: number) => {
     const clip = clips[i];
+    if (!clip.clipPath) return;
     if (!audio.current) {
       audio.current = new Audio();
       audio.current.addEventListener('pause', () => setPlaying(-1));
@@ -61,11 +62,11 @@ export const PodcastClips: React.FC<PodcastClipsProps> = ({ entry, savedSentence
     }
     const a = audio.current;
     if (playing === i) { a.pause(); return; }
-    const from = Math.max(0, clip.start - 2);
-    const to = clip.end + 1;
-    // Media fragment: the browser seeks to `from` and stops at `to`; timeupdate is a fallback.
-    a.src = `${clip.audioUrl}#t=${from.toFixed(1)},${to.toFixed(1)}`;
-    a.ontimeupdate = () => { if (a.currentTime >= to) a.pause(); };
+    // Our own clip, cut from the audio that was transcribed. The publishers' live files carry
+    // dynamic ads, so seeking into them by timestamp lands tens of seconds off.
+    const url = await clipUrl(clip.clipPath);
+    if (!url) return;
+    a.src = url;
     a.play().then(() => setPlaying(i)).catch(() => setPlaying(-1));
   };
 
@@ -116,15 +117,23 @@ export const PodcastClips: React.FC<PodcastClipsProps> = ({ entry, savedSentence
             const saved = savedSentences.includes(c.text);
             return (
               <li key={i} className="grid grid-cols-[44px_minmax(0,1fr)] sm:grid-cols-[48px_minmax(0,1fr)] gap-x-4 py-5">
-                <button
-                  onClick={() => toggle(i)}
-                  aria-label={`${playing === i ? 'Pause' : 'Play'} clip from ${c.show}`}
-                  className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full border flex items-center justify-center transition-colors ${playing === i ? 'bg-stone-900 border-stone-900 text-[#FBF9F4]' : 'border-[#E2DDD2] bg-white text-stone-900 hover:border-stone-900'}`}
-                >
-                  {playing === i ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
-                </button>
+                {c.clipPath ? (
+                  <button
+                    onClick={() => toggle(i)}
+                    aria-label={`${playing === i ? 'Pause' : 'Play'} clip from ${c.show}`}
+                    className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full border flex items-center justify-center transition-colors ${playing === i ? 'bg-stone-900 border-stone-900 text-[#FBF9F4]' : 'border-[#E2DDD2] bg-white text-stone-900 hover:border-stone-900'}`}
+                  >
+                    {playing === i ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
+                  </button>
+                ) : (
+                  <span aria-hidden="true" className="font-serif text-4xl leading-none text-[#D9D3C7] text-center pt-1">“</span>
+                )}
                 <div className="min-w-0 space-y-2.5">
-                  <p className="font-serif text-lg sm:text-xl leading-normal text-[#2B2A27]">“{highlight(c.text)}”</p>
+                  <p className="font-serif text-lg sm:text-xl leading-normal">
+                    {c.before && <span className="text-[#A8A399]">{c.before} </span>}
+                    <span className="text-[#2B2A27]">{highlight(c.text)}</span>
+                    {c.after && <span className="text-[#A8A399]"> {c.after}</span>}
+                  </p>
                   <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[13px]">
                     <span className="font-semibold text-[#2B2A27]">{c.show}</span>
                     <span className="text-[#8C8880] truncate max-w-[320px]">{c.episode}</span>
@@ -152,7 +161,7 @@ export const PodcastClips: React.FC<PodcastClipsProps> = ({ entry, savedSentence
       )}
 
       {status === 'ready' && clips.length > 0 && (
-        <p className="font-serif italic text-sm text-[#8C8880]">Plays the original audio from each show, starting 2 seconds before the line.</p>
+        <p className="font-serif italic text-sm text-[#8C8880]">Shown with the sentence before and after. Audio clips are being added.</p>
       )}
     </section>
   );

@@ -3,6 +3,11 @@ import { supabase } from './supabaseClient';
 /** A line from an indexed podcast episode where the word is actually said. */
 export interface PodcastClip {
   text: string;
+  /** The sentences just before and after, so the line can be read in context. */
+  before: string;
+  after: string;
+  /** Path of our own audio clip in the private "podcast-clips" bucket; null until it is cut. */
+  clipPath: string | null;
   start: number;
   end: number;
   show: string;
@@ -40,9 +45,20 @@ export const searchClips = async (term: string, limit = 8): Promise<PodcastClip[
   const { data, error } = await supabase.rpc('podcast_examples_for', { term });
   if (error) throw error;
   return ((data || []) as any[]).slice(0, limit).map(r => ({
-    text: r.text, start: r.start_s, end: r.end_s, show: r.show, kind: r.kind,
+    text: r.text, before: r.before_text || '', after: r.after_text || '', clipPath: r.clip_path ?? null,
+    start: r.start_s, end: r.end_s, show: r.show, kind: r.kind,
     episode: r.title, published: r.published, audioUrl: r.audio_url,
   }));
+};
+
+/**
+ * Short-lived URL for one of our own clips. Clips are cut from the exact audio that was
+ * transcribed — the publishers' live files carry dynamic ads that shift every timestamp.
+ */
+export const clipUrl = async (path: string): Promise<string | null> => {
+  if (!supabase) return null;
+  const { data } = await supabase.storage.from('podcast-clips').createSignedUrl(path, 3600);
+  return data?.signedUrl ?? null;
 };
 
 export const formatTime = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
