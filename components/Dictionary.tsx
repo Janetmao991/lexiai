@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { WordEntry, SynonymComparison, ContextMeaning, UserContext } from '../types';
 import { lookupWord, playPronunciation, compareSynonyms, explainInContext, pickSense } from '../services/geminiService';
 import { ipaLabel } from '../services/format';
+import { preparePronunciation } from '../services/pronunciation';
 import { Search, Volume2, Loader2, GitCompare, Sparkles, Check, Save, Bookmark, ArrowRight, ArrowLeft } from 'lucide-react';
 import { PodcastClips } from './PodcastClips';
 import { PodcastClip, formatTime } from '../services/podcastService';
@@ -315,6 +316,8 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
       </button>
     );
   };
+
+  useEffect(() => { if (lookupResult) preparePronunciation(lookupResult.word); }, [lookupResult?.word]);
 
   const unassigned = lookupResult ? (lookupResult.contexts || []).filter(c => !c.sense) : [];
 

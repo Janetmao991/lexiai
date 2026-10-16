@@ -1,10 +1,11 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { WordEntry, SrsRating } from '../types';
 import { srsService, MASTERY_META } from '../services/srsService';
 import { ChevronLeft, ChevronRight, CheckCircle2, Layers, Gamepad2, CalendarClock, Keyboard, Volume2 } from 'lucide-react';
 import { playPronunciation } from '../services/geminiService';
 import { ipaLabel } from '../services/format';
+import { preparePronunciation } from '../services/pronunciation';
 import { SynonymMatch } from './SynonymMatch';
 import { SpellingBee } from './SpellingBee';
 
@@ -62,6 +63,10 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
       newBacklog: fresh.length,
     };
   }, [words, newCardsToday]);
+
+  // Warm the pronunciation of the card on screen so the speaker button plays on the first tap.
+  const upcoming = mode === 'due' ? dueQueue[0]?.word : words[browseIndex % Math.max(1, words.length)]?.word;
+  useEffect(() => { if (upcoming) preparePronunciation(upcoming); }, [upcoming]);
 
   if (words.length === 0) {
     return (

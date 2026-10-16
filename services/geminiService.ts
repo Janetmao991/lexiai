@@ -1,5 +1,6 @@
 
 import { GoogleGenAI, Type, Modality, ThinkingLevel, GenerateContentParameters, GenerateContentResponse } from "@google/genai";
+import { pronounce } from "./pronunciation";
 import { WordEntry, PracticeFeedback, NativeRephrase, ContextExplanation, PodcastScript, SynonymComparison, SentenceAnalysis, ContextMeaning } from "../types";
 
 // ---- BYOK: the Gemini key lives in this browser only ----
@@ -553,45 +554,8 @@ export const speakNatural = async (text: string): Promise<void> => {
   });
 };
 
-export const playPronunciation = async (word: string): Promise<void> => {
-  try {
-    const ai = getAi();
-    const response = await generateWithRetry(ai, {
-      model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text: word }] }],
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: 'Kore' },
-            },
-        },
-      },
-    });
-
-    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (!base64Audio) throw new Error("No audio content returned");
-
-    const AudioContextClass = (window as any).AudioContext || (window as any).webkitAudioContext;
-    if (!AudioContextClass) return;
-    
-    const audioContext = new AudioContextClass({sampleRate: 24000});
-    const audioBuffer = await decodeAudioData(decode(base64Audio), audioContext, 24000, 1);
-    const source = audioContext.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(audioContext.destination);
-    source.start();
-  } catch (error) {
-    // Gemini TTS unavailable (no API key, quota, offline) — fall back to the
-    // browser voice so the speaker button always does something.
-    console.error("Error playing pronunciation:", error);
-    if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(word);
-      utterance.lang = 'en-US';
-      window.speechSynthesis.speak(utterance);
-    }
-  }
-};
+/** Kept for existing call sites; see services/pronunciation.ts. */
+export const playPronunciation = async (word: string): Promise<void> => pronounce(word);
 
 export const generatePodcastScript = async (words: string[]): Promise<PodcastScript> => {
   const ai = getAi();
