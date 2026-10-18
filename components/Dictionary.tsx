@@ -80,6 +80,8 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
       setError('Free-tier quota reached for now. Wait a minute and retry — or if it persists, today\'s allowance is used up (resets at midnight PT).');
     } else if (/timeout|deadline|aborted/i.test(msg)) {
       setError('The AI took too long to answer (free-tier congestion). Please try again.');
+    } else if (/Failed to fetch|fetch failed|Load failed|network/i.test(msg)) {
+      setError('Can\'t reach Gemini — check your internet or VPN, then try again.');
     } else if (/API key/i.test(msg)) {
       setError(msg);
     } else {

@@ -44,7 +44,7 @@ const getAi = (timeoutMs = 45000) => {
 
 // Free-tier Gemini throws transient 503/429 blips; retry those quietly before
 // surfacing an error to the UI.
-const TRANSIENT = /503|504|UNAVAILABLE|DEADLINE_EXCEEDED|Deadline expired|overloaded|high demand|fetch failed|network/i;
+const TRANSIENT = /503|504|UNAVAILABLE|DEADLINE_EXCEEDED|Deadline expired|overloaded|high demand|fetch failed|Failed to fetch|Load failed|network/i;
 const generateWithRetry = async (ai: GoogleGenAI, params: GenerateContentParameters, tries = 3): Promise<GenerateContentResponse> => {
   let lastError: unknown;
   for (let attempt = 0; attempt < tries; attempt++) {
