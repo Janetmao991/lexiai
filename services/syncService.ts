@@ -75,8 +75,8 @@ export const syncService = {
     }
 
     if (!persisted) {
-      // The device can't hold the notebook locally (iOS caps localStorage at
-      // ~5MB and a large notebook exceeds it). Serve the merged set from
+      // The device can't hold the notebook locally (only happens when IndexedDB
+      // is unavailable and the localStorage fallback hits its ~5MB cap). Serve the merged set from
       // memory — the cloud stays the source of truth and every app launch
       // re-pulls it. Without this, the re-read below returns the old (empty)
       // store and the UI shows 0 words despite a successful pull.
@@ -89,8 +89,7 @@ export const syncService = {
       return mergedWords;
     }
 
-    // Stamp everything synced in ONE write — per-word markAsSynced re-parses
-    // and rewrites the multi-MB store each call, freezing the tab for minutes.
+    // Stamp everything synced in ONE write rather than per-word markAsSynced.
     const now = new Date().toISOString();
     const finalWords = localStorageService.getAllWords();
     for (const entry of Object.values(finalWords)) {

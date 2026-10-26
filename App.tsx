@@ -151,7 +151,7 @@ const App: React.FC = () => {
         return;
       }
       // Signed in: the cloud save below still persists it; this device just
-      // can't keep a local copy (iOS storage quota). Warn once per session.
+      // can't keep a local copy (IndexedDB unavailable, localStorage full). Warn once per session.
       if (!storageWarnedRef.current) {
         storageWarnedRef.current = true;
         alert("This device's storage is full, so your notebook lives in the cloud only here — new words still save and sync, but the app needs internet to show them.");

@@ -3,6 +3,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { registerSW } from 'virtual:pwa-register';
 import App from './App.tsx';
+import { localStorageService } from './services/localStorageService.ts';
 
 // Auto-adopt new deployments: with registerType 'autoUpdate' the page reloads
 // as soon as a fresh service worker takes control; also re-check hourly so
@@ -15,9 +16,11 @@ if (!container) {
   throw new Error('Root element not found');
 }
 
-const root = createRoot(container);
-root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+// Load the notebook from IndexedDB first so the app's first render already has it.
+localStorageService.init().finally(() => {
+  createRoot(container).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
+});
