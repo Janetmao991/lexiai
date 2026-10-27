@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { WordEntry } from '../types';
 import { speechService, containsWord, RecordingHandle } from '../services/speechService';
-import { checkSentence, rephraseNatively, friendlyError } from '../services/geminiService';
+import { checkSentence, rephraseNatively, friendlyError } from '../services/claudeService';
 import { PracticeFeedback, NativeRephrase } from '../types';
 import { Mic, Square, Volume2, ArrowRight, Loader2, CheckCircle2, XCircle, MessageCircle, Lightbulb, Award, AlertCircle, Sparkles, RefreshCw } from 'lucide-react';
 

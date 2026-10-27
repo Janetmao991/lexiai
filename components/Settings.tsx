@@ -1,33 +1,62 @@
 
 import React, { useState } from 'react';
 import { X, KeyRound, Eye, EyeOff, Check, ExternalLink, Languages } from 'lucide-react';
-import { GLOSS_STORAGE, GLOSS_LANGS } from '../services/geminiService';
+import { GLOSS_STORAGE, GLOSS_LANGS } from '../services/claudeService';
+import { CLAUDE_MODELS, CLAUDE_MODEL_STORAGE } from '../services/claude';
 import { statsService } from '../services/statsService';
 
 interface SettingsProps {
   onClose: () => void;
 }
 
-const KEY_STORAGE = 'lexiai_api_key';
-const MODEL_STORAGE = 'lexiai_model';
+const CLAUDE_KEY_STORAGE = 'lexiai_claude_key';
+const GEMINI_KEY_STORAGE = 'lexiai_api_key'; // voice features only
 
-const MODELS = [
-  { id: 'gemini-3-flash-preview', label: 'Gemini Flash', hint: 'Fast, works on the free tier (recommended)' },
-  { id: 'gemini-3-pro-preview', label: 'Gemini Pro', hint: 'Highest quality — requires a paid API key' },
-];
+const MODELS = CLAUDE_MODELS;
+const MODEL_STORAGE = CLAUDE_MODEL_STORAGE;
+
+/** One masked key field with a show/hide toggle. */
+const KeyField: React.FC<{ label: string; value: string; onChange: (v: string) => void; envPresent: boolean; children: React.ReactNode }> =
+  ({ label, value, onChange, envPresent, children }) => {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="space-y-3">
+      <label className="block text-xs font-bold uppercase tracking-wider text-stone-400">
+        <KeyRound className="w-3.5 h-3.5 inline mr-1" /> {label}
+      </label>
+      <div className="relative">
+        <input
+          type={show ? 'text' : 'password'}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder={envPresent ? 'Using the key from .env.local' : 'Paste your API key'}
+          className="w-full p-4 pr-12 bg-stone-50 border border-stone-200 rounded-xl outline-none focus:ring-2 focus:ring-stone-900 font-mono text-sm"
+        />
+        <button
+          onClick={() => setShow(!show)}
+          className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-900"
+        >
+          {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+        </button>
+      </div>
+      <p className="text-xs text-stone-400 leading-relaxed">{children}</p>
+    </div>
+  );
+};
 
 export const Settings: React.FC<SettingsProps> = ({ onClose }) => {
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem(KEY_STORAGE) || '');
+  const [claudeKey, setClaudeKey] = useState(() => localStorage.getItem(CLAUDE_KEY_STORAGE) || '');
+  const [geminiKey, setGeminiKey] = useState(() => localStorage.getItem(GEMINI_KEY_STORAGE) || '');
   const [model, setModel] = useState(() => localStorage.getItem(MODEL_STORAGE) || MODELS[0].id);
   const [gloss, setGloss] = useState(() => localStorage.getItem(GLOSS_STORAGE) || '');
-  const [showKey, setShowKey] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  const envKeyPresent = Boolean(process.env.API_KEY);
 
   const handleSave = () => {
-    if (apiKey.trim()) localStorage.setItem(KEY_STORAGE, apiKey.trim());
-    else localStorage.removeItem(KEY_STORAGE);
+    for (const [storage, value] of [[CLAUDE_KEY_STORAGE, claudeKey], [GEMINI_KEY_STORAGE, geminiKey]]) {
+      if (value.trim()) localStorage.setItem(storage, value.trim());
+      else localStorage.removeItem(storage);
+    }
     localStorage.setItem(MODEL_STORAGE, model);
     statsService.setGlossLang(gloss); // local + cloud, so phone and desktop agree
     setSaved(true);
@@ -42,32 +71,19 @@ export const Settings: React.FC<SettingsProps> = ({ onClose }) => {
           <button onClick={onClose} className="text-stone-400 hover:text-stone-900"><X /></button>
         </div>
 
-        <div className="space-y-3">
-          <label className="block text-xs font-bold uppercase tracking-wider text-stone-400">
-            <KeyRound className="w-3.5 h-3.5 inline mr-1" /> Gemini API Key
-          </label>
-          <div className="relative">
-            <input
-              type={showKey ? 'text' : 'password'}
-              value={apiKey}
-              onChange={e => setApiKey(e.target.value)}
-              placeholder={envKeyPresent ? 'Using the key from .env.local' : 'Paste your API key'}
-              className="w-full p-4 pr-12 bg-stone-50 border border-stone-200 rounded-xl outline-none focus:ring-2 focus:ring-stone-900 font-mono text-sm"
-            />
-            <button
-              onClick={() => setShowKey(!showKey)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-900"
-            >
-              {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
-          </div>
-          <p className="text-xs text-stone-400 leading-relaxed">
-            Stored only in this browser — never uploaded anywhere.{' '}
-            <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" className="text-stone-700 underline inline-flex items-center gap-0.5">
-              Get a free key <ExternalLink className="w-3 h-3" />
-            </a>
-          </p>
-        </div>
+        <KeyField label="Claude API Key" value={claudeKey} onChange={setClaudeKey} envPresent={Boolean(process.env.ANTHROPIC_API_KEY)}>
+          Powers lookups, feedback and chat. Stored only in this browser — never uploaded anywhere.{' '}
+          <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer" className="text-stone-700 underline inline-flex items-center gap-0.5">
+            Get a key <ExternalLink className="w-3 h-3" />
+          </a>
+        </KeyField>
+
+        <KeyField label="Gemini API Key (voice)" value={geminiKey} onChange={setGeminiKey} envPresent={Boolean(process.env.API_KEY)}>
+          Only for voice: transcribing your speech and natural-sounding read-aloud. Optional — without it the browser's own voice is used.{' '}
+          <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" className="text-stone-700 underline inline-flex items-center gap-0.5">
+            Get a free key <ExternalLink className="w-3 h-3" />
+          </a>
+        </KeyField>
 
         <div className="space-y-3">
           <label className="block text-xs font-bold uppercase tracking-wider text-stone-400">AI Model</label>

@@ -1,7 +1,8 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { WordEntry, PodcastScript } from '../types';
-import { generatePodcastScript, generatePodcastAudio } from '../services/geminiService';
+import { generatePodcastScript } from '../services/claudeService';
+import { generatePodcastAudio } from '../services/geminiService';
 import { Mic2, Play, Pause, Loader2, RotateCcw } from 'lucide-react';
 
 interface PodcastProps {

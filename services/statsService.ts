@@ -1,7 +1,7 @@
 import { UserStats, DailyProgress, WordEntry, UserPrefs } from '../types';
 import { srsService, todayStr, daysFromToday } from './srsService';
 import { supabase } from './supabaseClient';
-import { GLOSS_STORAGE } from './geminiService';
+import { GLOSS_STORAGE } from './claudeService';
 
 const STATS_KEY = 'lexiai_stats_v1';
 
@@ -132,7 +132,7 @@ const touchStreak = (stats: UserStats) => {
   stats.lastActiveDate = today;
 };
 
-/** Mirror the chosen gloss language into localStorage, where geminiService reads it synchronously. */
+/** Mirror the chosen gloss language into localStorage, where claudeService reads it synchronously. */
 const applyPrefsLocally = (prefs?: UserPrefs) => {
   if (!prefs) return;
   if (prefs.glossLang) localStorage.setItem(GLOSS_STORAGE, prefs.glossLang);

@@ -43,6 +43,7 @@ export default defineConfig(({ mode }) => {
     define: {
       // This ensures process.env.* works in the Vite build
       'process.env.API_KEY': JSON.stringify(env.API_KEY),
+      'process.env.ANTHROPIC_API_KEY': JSON.stringify(env.ANTHROPIC_API_KEY),
       'process.env.SUPABASE_URL': JSON.stringify(env.SUPABASE_URL),
       'process.env.SUPABASE_KEY': JSON.stringify(env.SUPABASE_KEY)
     }

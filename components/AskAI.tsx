@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { askLexiTurn, analyzeSource, hasApiKey, ImageWordPick, LexiPart } from '../services/geminiService';
+import { askLexiTurn, analyzeSource, hasApiKey, ImageWordPick, LexiPart } from '../services/claudeService';
 import { Sparkles, X, Send, Loader2, Eraser, ImagePlus, Search, Paperclip, Upload, FileText } from 'lucide-react';
 
 interface Msg {

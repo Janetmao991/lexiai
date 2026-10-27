@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { WordEntry } from '../types';
 import { supabase } from '../services/supabaseClient';
 import { searchClips, PodcastClip, formatTime, inflectionPattern, clipUrl } from '../services/podcastService';
-import { tagSenses } from '../services/geminiService';
+import { tagSenses } from '../services/claudeService';
 import { Play, Pause, Loader2, Bookmark, Check } from 'lucide-react';
 
 type Sense = { meaning: number; definition: number } | null;

@@ -2,7 +2,7 @@
 
 An AI-powered vocabulary workbench for advanced English learners. Look up words with finance-aware definitions, collect them in a notebook with real-world reading contexts, then actually *master* them through spaced repetition, writing practice, **speaking practice**, and AI-generated podcasts — all wrapped in a daily-quest & streak system.
 
-**Bring your own keys, own your own data.** Every user runs LexiAI with their free Gemini API key and (optionally) their own free Supabase project. No middleman server, no usage fees.
+**Bring your own keys, own your own data.** Every user runs LexiAI with their own Claude API key (plus an optional free Gemini key for voice) and (optionally) their own free Supabase project. No middleman server, no usage fees.
 
 ## Features
 
@@ -28,14 +28,12 @@ cp .env.example .env.local   # then fill in your keys (see below)
 npm run dev
 ```
 
-### 1. Gemini API key (required for AI features)
+### 1. API keys
 
-Get a free key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey) and either:
+- **Claude API key (required for AI features)** — get one at [console.anthropic.com](https://console.anthropic.com/settings/keys). Powers lookups, feedback, chat and analysis. Default model: Claude Opus 5.5 (switchable to Sonnet 5.5 / Haiku 5.5 in Settings).
+- **Gemini API key (optional, voice only)** — free at [aistudio.google.com/apikey](https://aistudio.google.com/apikey). Used for speech transcription, natural-sounding read-aloud and podcast audio; without it the browser's own voice features are used.
 
-- put it in `.env.local` as `API_KEY=...`, **or**
-- paste it in the app under **Settings (gear icon)** — it is stored only in your browser and never uploaded.
-
-The default model is Gemini Flash, which works on the free tier. Speech recognition uses the browser's Web Speech API on Chrome/Edge and falls back to Gemini audio transcription on Safari/iOS.
+Put them in `.env.local` as `ANTHROPIC_API_KEY=...` and `API_KEY=...`, **or** paste them in the app under **Settings (gear icon)** — stored only in your browser and never uploaded.
 
 ### 2. Supabase (optional — for accounts & cross-device sync)
 
@@ -65,7 +63,7 @@ Set `API_KEY` (optional), `SUPABASE_URL` and `SUPABASE_KEY` as environment varia
 
 ## Tech Stack
 
-React 18 + TypeScript + Vite · Tailwind CSS · Gemini API (`@google/genai`) · Supabase (auth + Postgres with RLS) · vite-plugin-pwa
+React 18 + TypeScript + Vite · Tailwind CSS · Claude API (`@anthropic-ai/sdk`) · Gemini API for audio (`@google/genai`) · Supabase (auth + Postgres with RLS) · vite-plugin-pwa
 
 ## License
 

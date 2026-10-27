@@ -14,7 +14,7 @@ import { statsService, levelForXp } from './services/statsService.ts';
 import { ProgressPanel } from './components/ProgressPanel.tsx';
 import { Settings } from './components/Settings.tsx';
 import { AskAI } from './components/AskAI.tsx';
-import { hasApiKey } from './services/geminiService.ts';
+import { hasApiKey } from './services/claudeService.ts';
 import type { Session } from '@supabase/supabase-js';
 
 const App: React.FC = () => {
@@ -567,7 +567,7 @@ const App: React.FC = () => {
         <div className="bg-amber-50 border-b border-amber-100">
           <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
             <p className="text-sm text-amber-800">
-              AI features need a Gemini API key (free). It stays in this browser only.
+              AI features need a Claude API key. It stays in this browser only.
             </p>
             <button
               onClick={() => setShowSettings(true)}

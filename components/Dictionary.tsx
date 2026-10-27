@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { WordEntry, SynonymComparison, ContextMeaning, UserContext } from '../types';
-import { lookupWord, playPronunciation, compareSynonyms, explainInContext, pickSense } from '../services/geminiService';
+import { lookupWord, compareSynonyms, explainInContext, pickSense } from '../services/claudeService';
+import { playPronunciation } from '../services/geminiService';
 import { ipaLabel } from '../services/format';
 import { preparePronunciation } from '../services/pronunciation';
 import { Search, Volume2, Loader2, GitCompare, Sparkles, Check, Save, Bookmark, ArrowRight, ArrowLeft } from 'lucide-react';
@@ -81,7 +82,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
     } else if (/timeout|deadline|aborted/i.test(msg)) {
       setError('The AI took too long to answer (free-tier congestion). Please try again.');
     } else if (/Failed to fetch|fetch failed|Load failed|network/i.test(msg)) {
-      setError('Can\'t reach Gemini — check your internet or VPN, then try again.');
+      setError('Can\'t reach Claude — check your internet or VPN, then try again.');
     } else if (/API key/i.test(msg)) {
       setError(msg);
     } else {

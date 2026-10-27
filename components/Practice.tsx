@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { WordEntry, PracticeFeedback } from '../types';
-import { checkSentence } from '../services/geminiService';
+import { checkSentence } from '../services/claudeService';
 import { PenTool, Check, AlertCircle, RefreshCw, Loader2, Award } from 'lucide-react';
 
 interface PracticeProps {

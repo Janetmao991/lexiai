@@ -1,7 +1,8 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { WordEntry, UserContext } from '../types';
-import { analyzeContextFromText, playPronunciation, askAboutContext } from '../services/geminiService';
+import { analyzeContextFromText, askAboutContext } from '../services/claudeService';
+import { playPronunciation } from '../services/geminiService';
 import { srsService, MASTERY_META } from '../services/srsService';
 import { ipaLabel } from '../services/format';
 import { Trash2, Book, ArrowRight, ChevronDown, Plus, Loader2, X, RefreshCw, Search, Volume2, MessageSquare, Send, Sparkles, BookOpen } from 'lucide-react';
