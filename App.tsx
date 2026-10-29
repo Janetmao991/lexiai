@@ -3,8 +3,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Dictionary } from './components/Dictionary.tsx';
 import { Notebook } from './components/Notebook.tsx';
 import { Flashcards, DAILY_NEW_CARD_LIMIT } from './components/Flashcards.tsx';
+import { Podcasts } from './components/Podcasts.tsx';
 import { WordEntry, ViewState, SrsRating, UserStats } from './types.ts';
-import { Search, LayoutGrid, Layers, X, Cloud, CloudOff, Loader2, Database, Terminal, LogOut, Download, Upload, Flame, Settings as SettingsIcon } from 'lucide-react';
+import { Search, LayoutGrid, Layers, Headphones, X, Cloud, CloudOff, Loader2, Database, Terminal, LogOut, Download, Upload, Flame, Settings as SettingsIcon } from 'lucide-react';
 import { localStorageService } from './services/localStorageService.ts';
 import { syncService } from './services/syncService.ts';
 import { cloudService } from './services/cloudService.ts';
@@ -321,6 +322,7 @@ const App: React.FC = () => {
     { id: ViewState.DICTIONARY, label: 'Look up', icon: <Search className="w-5 h-5" />, badge: 0 },
     { id: ViewState.NOTEBOOK, label: 'Notebook', icon: <LayoutGrid className="w-5 h-5" />, badge: 0 },
     { id: ViewState.FLASHCARDS, label: 'Review', icon: <Layers className="w-5 h-5" />, badge: reviewDue },
+    { id: ViewState.PODCAST, label: 'Podcasts', icon: <Headphones className="w-5 h-5" />, badge: 0 },
   ];
 
   // Embed mode (?embed=1): slim chrome for external lookup panels (e.g. Obsidian) — dictionary only.
@@ -583,6 +585,7 @@ const App: React.FC = () => {
         {view === ViewState.DICTIONARY && <Dictionary onSave={handleSaveWord} savedWords={savedWords} lookupRequest={dictLookup} />}
         {view === ViewState.NOTEBOOK && <Notebook words={savedWords} onDelete={handleDeleteWord} onUpdateWord={handleSaveWord} onOpenWord={(word) => { setDictLookup({ word, n: Date.now() }); setView(ViewState.DICTIONARY); }} />}
         {view === ViewState.FLASHCARDS && <Flashcards words={savedWords} onReview={handleReview} onGameComplete={handleGameComplete} onSpellCorrect={handleSpellCorrect} newCardsToday={stats.daily.newCards ?? 0} />}
+        {view === ViewState.PODCAST && <Podcasts words={savedWords} onUpdateWord={handleSaveWord} onOpenWord={(word) => { setDictLookup({ word, n: Date.now() }); setView(ViewState.DICTIONARY); }} />}
       </main>
 
       {/* Mobile bottom tab bar — the desktop nav above is hidden below md */}
@@ -590,7 +593,7 @@ const App: React.FC = () => {
         className={`${isEmbed ? 'hidden' : 'md:hidden'} fixed bottom-0 inset-x-0 z-50 bg-white/90 backdrop-blur-md border-t border-stone-200`}
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
-        <div className="grid grid-cols-3">
+        <div className="grid grid-cols-4">
           {navItems.map(item => (
             <button
               key={item.id}

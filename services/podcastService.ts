@@ -52,6 +52,22 @@ export const searchClips = async (term: string, limit = 8): Promise<PodcastClip[
 };
 
 /**
+ * Which of these words have curated clips, with how many each. One query per 150 words
+ * (keeps the request URL short); returns an empty map when signed out.
+ */
+export const wordsWithClips = async (words: string[]): Promise<Map<string, number>> => {
+  const counts = new Map<string, number>();
+  if (!supabase) return counts;
+  const lemmas = [...new Set(words.map(w => w.trim().toLowerCase()).filter(Boolean))];
+  for (let i = 0; i < lemmas.length; i += 150) {
+    const { data, error } = await supabase.from('podcast_examples').select('lemma').in('lemma', lemmas.slice(i, i + 150));
+    if (error) throw error;
+    for (const r of (data || []) as { lemma: string }[]) counts.set(r.lemma, (counts.get(r.lemma) ?? 0) + 1);
+  }
+  return counts;
+};
+
+/**
  * Short-lived URL for one of our own clips. Clips are cut from the exact audio that was
  * transcribed — the publishers' live files carry dynamic ads that shift every timestamp.
  */
