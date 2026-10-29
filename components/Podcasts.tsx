@@ -3,6 +3,7 @@ import { WordEntry, UserContext } from '../types';
 import { supabase } from '../services/supabaseClient';
 import { wordsWithClips, PodcastClip, formatTime } from '../services/podcastService';
 import { PodcastClips } from './PodcastClips';
+import { fillGlosses } from '../services/claudeService';
 import { ChevronDown, Loader2, Search, Headphones, ArrowRight } from 'lucide-react';
 
 interface PodcastsProps {
@@ -116,7 +117,10 @@ export const Podcasts: React.FC<PodcastsProps> = ({ words, onUpdateWord, onOpenW
                 return (
                   <div key={entry.word} className={`rounded-[14px] transition-colors ${isOpen ? 'bg-[#FBF9F4] my-1' : ''}`}>
                     <button
-                      onClick={() => setOpen(isOpen ? null : entry.word)}
+                      onClick={() => {
+                        setOpen(isOpen ? null : entry.word);
+                        if (!isOpen) fillGlosses(entry).then(filled => { if (filled) onUpdateWord(filled); }).catch(() => {});
+                      }}
                       aria-expanded={isOpen}
                       className="w-full text-left flex items-center gap-3 min-h-[60px] px-4 py-2.5 rounded-[14px] hover:bg-[#FBF9F4] transition-colors"
                     >

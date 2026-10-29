@@ -377,3 +377,27 @@ ${sentences.map((s, i) => `[${i + 1}] ${s}`).join('\n')}`,
     return hit ? { meaning: hit.mi, definition: hit.di } : null;
   });
 };
+
+/**
+ * Glosses for the definitions that don't have one yet — words saved before the gloss
+ * language was switched on, or imported from elsewhere. One call for the whole entry;
+ * returns null when there is nothing to fill (gloss off, or every sense already has one).
+ */
+export const fillGlosses = async (entry: WordEntry): Promise<WordEntry | null> => {
+  const lang = getGlossLang();
+  if (!lang) return null;
+  const missing = entry.meanings.flatMap((m, mi) =>
+    m.definitions.map((d, di) => ({ mi, di, text: `${m.partOfSpeech}: ${d.definition}`, has: Boolean(d.gloss?.trim()) })))
+    .filter(s => !s.has);
+  if (missing.length === 0) return null;
+  const name = GLOSS_LANGS.find(g => g.id === lang)?.name || lang;
+  const res = await claudeJson<{ glosses: string[] }>(`For each numbered sense of the English word "${entry.word}", write a ${name} gloss of THAT specific sense.
+Lead with the neutral core meaning as a dictionary would; only if the sense carries a register or connotation, append it in brackets. 5–20 characters, separated by "；". Use standard ${name} finance/business terminology for finance senses. Return the glosses in the same order.
+${missing.map((s, i) => `${i + 1}. ${s.text}`).join('\n')}`,
+    S.obj({ glosses: S.arr(S.str()) }), { maxTokens: 2000 });
+  const glosses = res?.glosses || [];
+  if (!glosses.some(g => g?.trim())) return null;
+  const meanings = entry.meanings.map(m => ({ ...m, definitions: m.definitions.map(d => ({ ...d })) }));
+  missing.forEach((s, i) => { if (glosses[i]?.trim()) meanings[s.mi].definitions[s.di].gloss = glosses[i].trim(); });
+  return { ...entry, meanings };
+};

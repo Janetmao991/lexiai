@@ -4,7 +4,7 @@ import { WordEntry, SrsRating } from '../types';
 import { srsService, MASTERY_META } from '../services/srsService';
 import { ChevronLeft, ChevronRight, CheckCircle2, Layers, Gamepad2, CalendarClock, Keyboard, Volume2 } from 'lucide-react';
 import { playPronunciation } from '../services/geminiService';
-import { ipaLabel } from '../services/format';
+import { ipaLabel, senseLabel } from '../services/format';
 import { preparePronunciation } from '../services/pronunciation';
 import { SynonymMatch } from './SynonymMatch';
 import { SpellingBee } from './SpellingBee';
@@ -26,7 +26,6 @@ const isReverseCard = (w: WordEntry) => (w.srs?.reps ?? 0) >= 2 && (w.srs!.reps 
 // New words enter the SRS rotation gradually so the due pile stays humane.
 export const DAILY_NEW_CARD_LIMIT = 20;
 
-const ROMAN = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x'];
 
 /** Highlighter stroke under the word inside the learner's saved sentence. */
 const markWord = (text: string, word: string): React.ReactNode => {
@@ -219,7 +218,7 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
             <p className="font-serif italic text-[13px] text-[#8C8880]">{ctx.sourceTitle} · {new Date(ctx.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</p>
             {isFlipped && (
               <div className="border-t border-[#F2EEE6] pt-5 grid grid-cols-[32px_minmax(0,1fr)] gap-x-1.5 animate-fade-in">
-                <span aria-hidden="true" className="font-serif italic text-[17px] text-[#B5AFA3] leading-[1.45]">{ctx.sense ? `${ROMAN[ctx.sense.definition] ?? ctx.sense.definition + 1}.` : ''}</span>
+                <span aria-hidden="true" className="font-serif italic text-[17px] text-[#B5AFA3] leading-[1.45]">{ctx.sense ? `${senseLabel(currentCard, ctx.sense.meaning, ctx.sense.definition)}.` : ''}</span>
                 <div className="space-y-2">
                   <p className="font-serif text-xl leading-[1.38] font-bold text-stone-900">{ctxSense?.definition || ctx.explanation}</p>
                   {ctxSense?.gloss && <p className="gloss">{ctxSense.gloss}</p>}
@@ -264,7 +263,7 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
                     <p className="font-serif italic text-[#2B2A27] first-letter:lowercase">{m.partOfSpeech}</p>
                     {m.definitions.slice(0, 3).map((d, di) => (
                       <div key={di} className="grid grid-cols-[28px_minmax(0,1fr)] gap-x-1">
-                        <span aria-hidden="true" className="font-serif italic text-[#B5AFA3] leading-[1.45]">{ROMAN[di]}.</span>
+                        <span aria-hidden="true" className="font-serif italic text-[#B5AFA3] leading-[1.45]">{senseLabel(currentCard, mi, di)}.</span>
                         <div className="space-y-1">
                           <p className="font-serif text-lg leading-snug text-stone-900">{d.definition}</p>
                           {d.gloss && <p className="gloss !text-[15px]">{d.gloss}</p>}

@@ -1,10 +1,10 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { WordEntry, UserContext } from '../types';
-import { analyzeContextFromText, askAboutContext } from '../services/claudeService';
+import { analyzeContextFromText, askAboutContext, fillGlosses } from '../services/claudeService';
 import { playPronunciation } from '../services/geminiService';
 import { srsService, MASTERY_META } from '../services/srsService';
-import { ipaLabel } from '../services/format';
+import { ipaLabel, senseLabel } from '../services/format';
 import { Trash2, Book, ArrowRight, ChevronDown, Plus, Loader2, X, RefreshCw, Search, Volume2, MessageSquare, Send, Sparkles, BookOpen } from 'lucide-react';
 
 interface Message {
@@ -57,6 +57,9 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onUpdateWor
       newSet.delete(word);
     } else {
       newSet.add(word);
+      // Saved before a gloss language was chosen: add the missing glosses as it opens.
+      const entry = words.find(w => w.word === word);
+      if (entry) fillGlosses(entry).then(filled => { if (filled) onUpdateWord(filled); }).catch(() => {});
     }
     setExpandedWords(newSet);
   };
@@ -199,8 +202,6 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onUpdateWor
     "Explain the 'Summary for the Learner'."
   ];
 
-  const ROMAN = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x'];
-
   /** Highlighter stroke under the word inside a saved sentence. */
   const markWord = (text: string, word: string): React.ReactNode => {
     const head = word.trim().split(/\s+/)[0] || word;
@@ -212,7 +213,7 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onUpdateWor
   const senseOf = (entry: WordEntry, ctx: UserContext) => {
     if (!ctx.sense) return null;
     const def = entry.meanings[ctx.sense.meaning]?.definitions[ctx.sense.definition];
-    return def ? { label: ROMAN[ctx.sense.definition] ?? String(ctx.sense.definition + 1), def } : null;
+    return def ? { label: senseLabel(entry, ctx.sense.meaning, ctx.sense.definition), def } : null;
   };
 
   if (words.length === 0) {
@@ -376,7 +377,7 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onUpdateWor
                           </div>
                           {meaning.definitions.map((def, di) => (
                             <div key={di} className="grid grid-cols-[30px_minmax(0,1fr)] gap-x-1">
-                              <span aria-hidden="true" className="font-serif italic text-[#B5AFA3] leading-[1.45]">{ROMAN[di] ?? di + 1}.</span>
+                              <span aria-hidden="true" className="font-serif italic text-[#B5AFA3] leading-[1.45]">{senseLabel(entry, mi, di)}.</span>
                               <div className="space-y-2 min-w-0">
                                 <p className="font-serif text-lg leading-snug font-bold text-stone-900 break-words">{def.definition}</p>
                                 {def.gloss && <p className="gloss !text-[15px]">{def.gloss}</p>}

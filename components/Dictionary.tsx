@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { WordEntry, SynonymComparison, ContextMeaning, UserContext } from '../types';
-import { lookupWord, compareSynonyms, explainInContext, pickSense } from '../services/claudeService';
+import { lookupWord, compareSynonyms, explainInContext, pickSense, fillGlosses } from '../services/claudeService';
 import { playPronunciation } from '../services/geminiService';
-import { ipaLabel } from '../services/format';
+import { ipaLabel, senseLabel } from '../services/format';
 import { preparePronunciation } from '../services/pronunciation';
 import { Search, Volume2, Loader2, GitCompare, Sparkles, Check, Save, Bookmark, ArrowRight, ArrowLeft } from 'lucide-react';
 
@@ -22,8 +22,6 @@ const normalizeForm = (s: string) =>
 
 const IS_EMBED = new URLSearchParams(window.location.search).has('embed');
 
-const ROMAN = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x', 'xi', 'xii'];
-const roman = (n: number) => `${ROMAN[n] ?? n + 1}.`;
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -98,7 +96,8 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
     // sentences line up with the senses they were filed under.
     const saved = !exact && savedEntry(word);
     if (saved) {
-      setLookupResult(saved);
+      // "You searched …" is about this search, not whatever query first saved the word.
+      setLookupResult({ ...saved, originalQuery: word });
       return;
     }
     setLoading(true);
@@ -177,7 +176,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
       // Same sentence saved again replaces the old note instead of piling up duplicates.
       const others = (entry.contexts || []).filter(c => normalizeForm(c.targetSentence) !== normalizeForm(contextSentence));
       onSave({ ...entry, contexts: [...others, ctx] });
-      setSavedSense(sense ? roman(sense.definition) : '');
+      setSavedSense(sense ? `${senseLabel(entry, sense.meaning, sense.definition)}.` : '');
       setContextSave('saved');
     } catch (err: any) {
       setContextSave('idle');
@@ -226,7 +225,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
     const mine = (entry.contexts || []).filter(c => c.sense?.meaning === mi && c.sense?.definition === di);
     return (
       <section key={`${mi}-${di}`} className="grid grid-cols-[32px_minmax(0,1fr)] sm:grid-cols-[44px_minmax(0,1fr)] gap-x-2">
-        <span aria-hidden="true" className="font-serif italic text-xl text-[#B5AFA3] leading-[1.45]">{roman(di)}</span>
+        <span aria-hidden="true" className="font-serif italic text-xl text-[#B5AFA3] leading-[1.45]">{senseLabel(entry, mi, di)}.</span>
         <div className="space-y-5 min-w-0">
           <div className="space-y-2.5">
             <p className="font-serif text-xl sm:text-2xl leading-[1.38] font-bold text-stone-900 break-words">{d.definition}</p>
@@ -300,6 +299,23 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
   };
 
   useEffect(() => { if (lookupResult) preparePronunciation(lookupResult.word); }, [lookupResult?.word]);
+
+  // Gloss language is on but this entry predates it (or was imported): fill the missing
+  // glosses once, and keep them on the saved word so it isn't asked again.
+  useEffect(() => {
+    if (!lookupResult) return;
+    let cancelled = false;
+    fillGlosses(lookupResult).then(filled => {
+      if (!filled || cancelled) return;
+      setLookupResult(cur => (cur && cur.word === filled.word ? { ...cur, meanings: filled.meanings } : cur));
+      const saved = savedEntry(filled.word);
+      // Only when this entry IS the saved one — a fresh lookup's senses may not line up with it.
+      if (saved && JSON.stringify(saved.meanings.map(m => m.definitions.map(d => d.definition))) === JSON.stringify(filled.meanings.map(m => m.definitions.map(d => d.definition)))) {
+        onSave({ ...saved, meanings: filled.meanings });
+      }
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [lookupResult?.word]);
 
   const unassigned = lookupResult ? (lookupResult.contexts || []).filter(c => !c.sense) : [];
 

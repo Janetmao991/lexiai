@@ -3,6 +3,7 @@ import { WordEntry } from '../types';
 import { supabase } from '../services/supabaseClient';
 import { searchClips, PodcastClip, formatTime, inflectionPattern, clipUrl } from '../services/podcastService';
 import { tagSenses } from '../services/claudeService';
+import { senseLabel } from '../services/format';
 import { Play, Pause, Loader2, Bookmark, Check } from 'lucide-react';
 
 type Sense = { meaning: number; definition: number } | null;
@@ -13,8 +14,6 @@ interface PodcastClipsProps {
   savedSentences: string[];
   onSaveClip: (clip: PodcastClip, sense: Sense) => void;
 }
-
-const ROMAN = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x'];
 
 /** "Heard in podcasts": real lines from indexed shows where the word is said, playable in place. */
 export const PodcastClips: React.FC<PodcastClipsProps> = ({ entry, savedSentences, onSaveClip }) => {
@@ -142,7 +141,7 @@ export const PodcastClips: React.FC<PodcastClipsProps> = ({ entry, savedSentence
                   <div className="flex flex-wrap items-center gap-1 -ml-3">
                     {sense && (
                       <span className="min-h-[34px] px-3 flex items-center text-[13px] text-[#55524C]">
-                        Sense {ROMAN[sense.definition] ?? sense.definition + 1}.{def?.gloss ? ` · ${def.gloss.split('；')[0]}` : ''}
+                        Sense {senseLabel(entry, sense.meaning, sense.definition)}.{def?.gloss ? ` · ${def.gloss.split('；')[0]}` : ''}
                       </span>
                     )}
                     <button
