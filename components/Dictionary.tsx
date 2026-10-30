@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { WordEntry, SynonymComparison, ContextMeaning, UserContext } from '../types';
 import { lookupWord, compareSynonyms, explainInContext, pickSense, fillGlosses } from '../services/claudeService';
 import { playPronunciation } from '../services/geminiService';
@@ -22,6 +22,33 @@ const normalizeForm = (s: string) =>
 
 const IS_EMBED = new URLSearchParams(window.location.search).has('embed');
 
+
+/**
+ * Shrink a headline's font until it fits on one line (never below `min` px), so a long word like
+ * "ergonomically" isn't split mid-word. Re-fits when the box resizes. Past `min` it may wrap.
+ */
+const useFitOneLine = (text: string | undefined, min = 28) => {
+  const ref = useRef<HTMLHeadingElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const fit = () => {
+      el.style.fontSize = '';
+      el.style.whiteSpace = 'nowrap';
+      let size = parseFloat(getComputedStyle(el).fontSize);
+      while (el.scrollWidth > el.clientWidth && size > min) {
+        size = Math.max(min, size - 2);
+        el.style.fontSize = `${size}px`;
+      }
+      if (el.scrollWidth > el.clientWidth) el.style.whiteSpace = '';
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el.parentElement ?? el);
+    return () => ro.disconnect();
+  }, [text, min]);
+  return ref;
+};
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -298,6 +325,8 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
     );
   };
 
+  const headwordRef = useFitOneLine(lookupResult?.word);
+
   useEffect(() => { if (lookupResult) preparePronunciation(lookupResult.word); }, [lookupResult?.word]);
 
   // Gloss language is on but this entry predates it (or was imported): fill the missing
@@ -361,8 +390,8 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
           {lookupResult && (
             <article className={`${card} animate-fade-in-up px-5 sm:px-16 py-9 sm:py-14 space-y-10 sm:space-y-12`}>
               <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
-                <div className="space-y-4 min-w-0">
-                  <h1 className="font-serif font-bold text-5xl sm:text-[84px] leading-[0.95] tracking-[-0.03em] text-stone-900 break-words">{lookupResult.word}</h1>
+                <div className="space-y-4 min-w-0 flex-1">
+                  <h1 ref={headwordRef} className="font-serif font-bold text-5xl sm:text-[84px] leading-[0.95] tracking-[-0.03em] text-stone-900 break-words">{lookupResult.word}</h1>
                   <div className="flex items-center gap-3.5">
                     <span className="font-mono text-sm text-[#6B675F]">{ipaLabel(lookupResult.ipa, '/---/')}</span>
                     <span aria-hidden="true" className="w-px h-3.5 bg-[#E2DDD2]" />
