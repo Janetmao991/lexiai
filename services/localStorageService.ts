@@ -1,4 +1,5 @@
 import { WordEntry } from '../types';
+import { IS_DEMO, demoStore, demoFixture } from './demo';
 
 const WORDS_KEY = 'lexiai_words_v1';
 const METADATA_KEY = 'lexiai_metadata';
@@ -18,6 +19,10 @@ const STORE = 'kv';
 
 let words: Record<string, WordEntry> = {};
 let db: IDBDatabase | null = null;
+
+// Demo mode keeps its notebook in this tab's sessionStorage (seeded from the fixture) and
+// never opens the visitor's real IndexedDB or localStorage notebook.
+const kv = IS_DEMO ? demoStore : localStorage;
 
 const openDb = () => new Promise<IDBDatabase>((resolve, reject) => {
   const req = indexedDB.open(DB_NAME, 1);
@@ -67,6 +72,10 @@ const flush = async () => {
 
 /** Persist the in-memory notebook. Returns false only when nothing could store it. */
 const persist = (): boolean => {
+  if (IS_DEMO) {
+    demoStore.setItem(WORDS_KEY, JSON.stringify(words));
+    return true;
+  }
   if (db) {
     dirty = true;
     if (!writing) flush();
@@ -88,6 +97,11 @@ export const localStorageService = {
    * and frees the localStorage space.
    */
   init: async (): Promise<void> => {
+    if (IS_DEMO) {
+      const stored = demoStore.getItem(WORDS_KEY);
+      words = stored ? JSON.parse(stored) : structuredClone(demoFixture().notebook);
+      return;
+    }
     try {
       db = await openDb();
       const stored = await idbGet(WORDS_KEY);
@@ -238,7 +252,7 @@ export const localStorageService = {
    */
   getMetadata: () => {
     try {
-      const data = localStorage.getItem(METADATA_KEY);
+      const data = kv.getItem(METADATA_KEY);
       return data ? JSON.parse(data) : {};
     } catch (error) {
       console.error('Failed to get metadata:', error);
@@ -253,7 +267,7 @@ export const localStorageService = {
     try {
       const current = localStorageService.getMetadata();
       const updated = { ...current, ...metadata };
-      localStorage.setItem(METADATA_KEY, JSON.stringify(updated));
+      kv.setItem(METADATA_KEY, JSON.stringify(updated));
     } catch (error) {
       console.error('Failed to update metadata:', error);
     }

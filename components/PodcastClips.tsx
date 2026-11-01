@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { WordEntry } from '../types';
-import { supabase } from '../services/supabaseClient';
-import { searchClips, PodcastClip, formatTime, inflectionPattern, clipUrl } from '../services/podcastService';
+import { libraryAvailable, searchClips, PodcastClip, formatTime, inflectionPattern, clipUrl } from '../services/podcastService';
 import { tagSenses } from '../services/claudeService';
 import { senseLabel } from '../services/format';
+import { IS_DEMO } from '../services/demo';
 import { Play, Pause, Loader2, Bookmark, Check } from 'lucide-react';
 
 type Sense = { meaning: number; definition: number } | null;
@@ -31,9 +31,7 @@ export const PodcastClips: React.FC<PodcastClipsProps> = ({ entry, savedSentence
     setSenses([]);
     setPlaying(-1);
     (async () => {
-      if (!supabase) { setStatus('signedOut'); return; }
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) { if (!cancelled) setStatus('signedOut'); return; }
+      if (!(await libraryAvailable())) { if (!cancelled) setStatus('signedOut'); return; }
       try {
         const found = await searchClips(entry.word, 8);
         if (cancelled) return;
@@ -160,7 +158,7 @@ export const PodcastClips: React.FC<PodcastClipsProps> = ({ entry, savedSentence
       )}
 
       {status === 'ready' && clips.length > 0 && (
-        <p className="font-serif italic text-sm text-[#8C8880]">Shown with the sentence before and after. Audio clips are being added.</p>
+        <p className="font-serif italic text-sm text-[#8C8880]">Shown with the sentence before and after. {IS_DEMO ? 'In the demo, lines are text only — sign in to play the audio.' : 'Audio clips are being added.'}</p>
       )}
     </section>
   );

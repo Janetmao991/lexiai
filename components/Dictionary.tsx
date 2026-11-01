@@ -4,6 +4,7 @@ import { lookupWord, compareSynonyms, explainInContext, pickSense, fillGlosses }
 import { playPronunciation } from '../services/geminiService';
 import { ipaLabel, senseLabel } from '../services/format';
 import { preparePronunciation } from '../services/pronunciation';
+import { IS_DEMO, isDemoNote, showDemoNote, demoFixture } from '../services/demo';
 import { Search, Volume2, Loader2, GitCompare, Sparkles, Check, Save, Bookmark, ArrowRight, ArrowLeft } from 'lucide-react';
 
 interface DictionaryProps {
@@ -73,7 +74,11 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
   const [activeMode, setActiveMode] = useState<DictionaryMode>('DEFINE');
   const [loading, setLoading] = useState(false);
   const [savingWord, setSavingWord] = useState<string | null>(null);
-  const [error, setError] = useState('');
+  const [error, setErrorText] = useState('');
+  // Demo mode: "not in the demo" is a friendly note, not an error.
+  const [errorIsNote, setErrorIsNote] = useState(false);
+  const setError = (msg: string, isNote = false) => { setErrorText(msg); setErrorIsNote(isNote); };
+  const demoSuggestions = IS_DEMO ? demoFixture().suggestions : null;
 
   // Define (word)
   const [query, setQuery] = useState('');
@@ -100,6 +105,10 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
 
   const showError = (err: any, fallback: string) => {
     const msg = String(err?.message || '');
+    if (isDemoNote(err)) {
+      setError(msg, true);
+      return;
+    }
     if (/429|RESOURCE_EXHAUSTED|quota/i.test(msg)) {
       setError('Free-tier quota reached for now. Wait a minute and retry — or if it persists, today\'s allowance is used up (resets at midnight PT).');
     } else if (/timeout|deadline|aborted/i.test(msg)) {
@@ -225,7 +234,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
       const data = await compareSynonyms(words[0], words[1], words[2]);
       setCompareResult(data);
     } catch (err) {
-      setError('Failed to compare words.');
+      setError(isDemoNote(err) ? err.message : 'Failed to compare words.', isDemoNote(err));
     } finally {
       setLoading(false);
     }
@@ -238,6 +247,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
       const entry = await lookupWord(word);
       if (entry) onSave(entry);
     } catch (err) {
+      if (isDemoNote(err)) showDemoNote(err.message);
       console.error("Failed to save word from comparison", err);
     } finally {
       setSavingWord(null);
@@ -346,6 +356,26 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
     return () => { cancelled = true; };
   }, [lookupResult?.word]);
 
+  // Demo mode: "not in the demo" notes sit right under the input, above the sample chips.
+  const demoNoteBox = error && errorIsNote && (
+    <div role="status" className="max-w-xl mx-auto px-5 py-4 rounded-2xl bg-[#FBF7EC] border border-[#EFE3C4] text-center text-sm font-medium text-[#2B2A27] animate-fade-in">
+      {error}
+    </div>
+  );
+
+  // Demo mode: the sample sentences, tappable, on the empty Word and Sentence screens.
+  const otherSamples = demoSuggestions?.sentences.filter(s => !(activeMode === 'CONTEXT' && contextResult && s === contextSentence)) ?? [];
+  const sampleSentences = demoSuggestions && (
+    <div className="space-y-2.5">
+      <p className="lx-label text-center">{activeMode === 'CONTEXT' && contextResult ? 'More sample sentences' : 'Try a sample sentence'}</p>
+      {otherSamples.map(s => (
+        <button key={s} onClick={() => runContext(s)} className="w-full text-left px-5 py-3.5 rounded-2xl border border-[#EDE8DE] bg-white font-serif text-lg leading-snug text-[#2B2A27] hover:border-stone-900 transition-colors">
+          {s}
+        </button>
+      ))}
+    </div>
+  );
+
   const unassigned = lookupResult ? (lookupResult.contexts || []).filter(c => !c.sense) : [];
 
   return (
@@ -386,6 +416,8 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
               {loading ? <Loader2 className="animate-spin w-5 h-5" /> : <ArrowRight className="w-5 h-5" />}
             </button>
           </form>
+
+          {demoNoteBox}
 
           {lookupResult && (
             <article className={`${card} animate-fade-in-up px-5 sm:px-16 py-9 sm:py-14 space-y-10 sm:space-y-12`}>
@@ -498,6 +530,20 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
           {!lookupResult && !loading && (
             <p className="text-center font-serif italic text-[15px] text-[#8C8880]">Reading something? Paste the whole sentence to see which sense it uses.</p>
           )}
+
+          {!lookupResult && !loading && demoSuggestions && (
+            <div className="space-y-6">
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <span className="lx-label w-full text-center mb-1">Try a sample word</span>
+                {demoSuggestions.words.map(w => (
+                  <button key={w} onClick={() => doLookup(w)} className="min-h-[38px] px-4 rounded-full border border-[#E2DDD2] bg-white font-serif text-[16px] text-stone-900 hover:border-stone-900 transition-colors">
+                    {w}
+                  </button>
+                ))}
+              </div>
+              {sampleSentences}
+            </div>
+          )}
         </div>
       )}
 
@@ -518,6 +564,8 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
               {loading ? <Loader2 className="animate-spin w-5 h-5" /> : <ArrowRight className="w-5 h-5" />}
             </button>
           </form>
+
+          {demoNoteBox}
 
           {contextResult && (() => {
             const { before, hit, after } = splitAround(contextSentence, contextResult.surface);
@@ -625,6 +673,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
           {!contextResult && !loading && (
             <p className="text-center font-serif italic text-[15px] text-[#8C8880]">Know the word but not what it means here? Paste the sentence — Lexi explains the sense it uses.</p>
           )}
+          {!loading && sampleSentences}
         </div>
       )}
 
@@ -649,6 +698,11 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
                 </div>
               ))}
             </div>
+            {IS_DEMO && (
+              <button onClick={() => setCompareInputs(['appall', 'shock', 'horrify'])} className="text-sm text-[#55524C] hover:text-stone-900 underline underline-offset-4">
+                Try a sample: appall · shock · horrify
+              </button>
+            )}
             <button 
               onClick={handleCompare}
               disabled={loading || compareInputs.filter(i => i.trim()).length < 2}
@@ -713,8 +767,8 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
         </div>
       )}
 
-      {error && (
-        <div className="max-w-md mx-auto p-5 bg-red-50 border border-red-100 rounded-2xl text-red-700 text-center text-sm font-medium animate-fade-in">
+      {error && (!errorIsNote || activeMode === 'COMPARE') && (
+        <div className={`max-w-md mx-auto p-5 rounded-2xl text-center text-sm font-medium animate-fade-in ${errorIsNote ? 'bg-[#FBF7EC] border border-[#EFE3C4] text-[#2B2A27]' : 'bg-red-50 border border-red-100 text-red-700'}`}>
           {error}
         </div>
       )}

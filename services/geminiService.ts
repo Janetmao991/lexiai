@@ -2,17 +2,19 @@
 // Claude can't hear or speak, so these stay here; every text feature is in claudeService.ts.
 import { GoogleGenAI, Modality, ThinkingLevel, GenerateContentParameters, GenerateContentResponse } from "@google/genai";
 import { pronounce } from "./pronunciation";
+import { IS_DEMO, DemoNoteError } from "./demo";
 import { PodcastScript } from "../types";
 
 // ---- BYOK: the Gemini key lives in this browser only ----
 export const getApiKey = (): string =>
-  (typeof localStorage !== 'undefined' && localStorage.getItem('lexiai_api_key')) || process.env.API_KEY || '';
+  IS_DEMO ? '' : (typeof localStorage !== 'undefined' && localStorage.getItem('lexiai_api_key')) || process.env.API_KEY || '';
 
 export const hasApiKey = (): boolean => Boolean(getApiKey());
 
 const AUDIO_MODEL = 'gemini-3-flash-preview';
 
 const getAi = (timeoutMs = 45000) => {
+  if (IS_DEMO) throw new DemoNoteError();
   const key = getApiKey();
   if (!key) throw new Error('No Gemini API key configured. It powers voice features (transcription and natural voices) — open Settings and paste your free key from aistudio.google.com/apikey.');
   // Cap so a congested request fails visibly instead of spinning forever.

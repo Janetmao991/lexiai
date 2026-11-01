@@ -1,4 +1,6 @@
 import { supabase } from './supabaseClient';
+import { IS_DEMO } from './demo';
+import { demoSearchClips, demoWordsWithClips } from './demoService';
 
 /** A line from an indexed podcast episode where the word is actually said. */
 export interface PodcastClip {
@@ -16,6 +18,14 @@ export interface PodcastClip {
   published: string;
   audioUrl: string;
 }
+
+/** Whether the clip library can be queried: signed in, or the demo's bundled lines. */
+export const libraryAvailable = async (): Promise<boolean> => {
+  if (IS_DEMO) return true;
+  if (!supabase) return false;
+  const { data } = await supabase.auth.getSession();
+  return Boolean(data.session);
+};
 
 /**
  * Regex for the term and its inflections only (gauge → gauges/gauged/gauging) — used to
@@ -41,6 +51,7 @@ export const inflectionPattern = (term: string): RegExp => {
  * offline by podcast/build_examples.py — everyday shows first, one per episode. Empty when signed out.
  */
 export const searchClips = async (term: string, limit = 8): Promise<PodcastClip[]> => {
+  if (IS_DEMO) return (await demoSearchClips(term)).slice(0, limit);
   if (!supabase) return [];
   const { data, error } = await supabase.rpc('podcast_examples_for', { term });
   if (error) throw error;
@@ -56,6 +67,7 @@ export const searchClips = async (term: string, limit = 8): Promise<PodcastClip[
  * (keeps the request URL short); returns an empty map when signed out.
  */
 export const wordsWithClips = async (words: string[]): Promise<Map<string, number>> => {
+  if (IS_DEMO) return demoWordsWithClips(words);
   const counts = new Map<string, number>();
   if (!supabase) return counts;
   const lemmas = [...new Set(words.map(w => w.trim().toLowerCase()).filter(Boolean))];

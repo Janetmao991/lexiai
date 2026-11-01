@@ -16,6 +16,7 @@ import { ProgressPanel } from './components/ProgressPanel.tsx';
 import { Settings } from './components/Settings.tsx';
 import { AskAI } from './components/AskAI.tsx';
 import { hasApiKey } from './services/claudeService.ts';
+import { IS_DEMO, DEMO_NOTE_EVENT, showDemoNote, enterDemo, exitDemo } from './services/demo.ts';
 import type { Session } from '@supabase/supabase-js';
 
 const App: React.FC = () => {
@@ -54,6 +55,20 @@ const App: React.FC = () => {
   const [showProgress, setShowProgress] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [keyConfigured, setKeyConfigured] = useState(() => hasApiKey());
+  const [demoToast, setDemoToast] = useState<string | null>(null);
+
+  // Demo mode: short notes ("saved for this session only", "sign up to …") pop up as a toast.
+  useEffect(() => {
+    if (!IS_DEMO) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const onNote = (e: Event) => {
+      setDemoToast((e as CustomEvent<string>).detail);
+      clearTimeout(timer);
+      timer = setTimeout(() => setDemoToast(null), 4000);
+    };
+    window.addEventListener(DEMO_NOTE_EVENT, onNote);
+    return () => { window.removeEventListener(DEMO_NOTE_EVENT, onNote); clearTimeout(timer); };
+  }, []);
 
   const refreshFromLocal = () => {
     const localWordsMap = localStorageService.getAllWords();
@@ -101,6 +116,13 @@ const App: React.FC = () => {
   useEffect(() => {
     const hash = window.location.hash;
     if (!hash) return;
+    // Leaving the demo lands here (#signin / #signup) with the account form open.
+    if (hash === '#signin' || hash === '#signup') {
+      setAuthMode(hash === '#signup' ? 'signup' : 'signin');
+      setShowAccount(true);
+      window.history.replaceState(null, '', window.location.pathname);
+      return;
+    }
     if (/type=recovery/.test(hash)) setShowReset(true);
     const err = hash.match(/error_description=([^&]+)/);
     if (err) {
@@ -165,6 +187,7 @@ const App: React.FC = () => {
 
     if (isNew) {
       statsService.record('save', Object.values(localStorageService.getAllWords()));
+      if (IS_DEMO) showDemoNote('Saved for this demo session only — sign up to keep your own notebook.');
     }
 
     if (session) {
@@ -328,11 +351,40 @@ const App: React.FC = () => {
   // Embed mode (?embed=1): slim chrome for external lookup panels (e.g. Obsidian) — dictionary only.
   const isEmbed = new URLSearchParams(window.location.search).has('embed');
 
+  // "Try the demo" on the sign-in form: a no-account tour on sample data (reloads into ?demo=1).
+  const tryDemoButton = (
+    <div className="pt-2 space-y-3">
+      <div className="flex items-center gap-3 text-[11px] uppercase tracking-[0.2em] text-stone-300">
+        <span className="flex-1 h-px bg-stone-200" />or<span className="flex-1 h-px bg-stone-200" />
+      </div>
+      <button
+        type="button"
+        onClick={enterDemo}
+        className="w-full py-4 border-2 border-stone-900 text-stone-900 rounded-xl font-bold hover:bg-stone-900 hover:text-white transition-colors"
+      >
+        Try the demo
+      </button>
+      <p className="text-xs text-stone-400 text-center">No sign-up, no API key — explore LexiAI with sample words.</p>
+    </div>
+  );
+
   const accountLabel = session ? (session.user.email || '').split('@')[0] : 'Guest';
 
   return (
     <div className="min-h-screen bg-[#FBF9F4] text-stone-900">
       <header className="bg-[#FBF9F4]/85 backdrop-blur-md border-b border-[#EDE8DE] sticky top-0 z-50">
+        {IS_DEMO && (
+          <div className="bg-stone-900 text-[#FBF9F4] text-[13px]">
+            <div className="max-w-5xl mx-auto px-4 sm:px-6 h-9 flex items-center justify-center gap-3">
+              <span className="font-semibold">Demo mode</span>
+              <span aria-hidden="true" className="text-stone-500">·</span>
+              <span className="hidden sm:inline text-stone-400">Sample words, nothing leaves this tab</span>
+              <span aria-hidden="true" className="hidden sm:inline text-stone-500">·</span>
+              <button onClick={() => exitDemo('signup')} className="font-semibold underline underline-offset-4 hover:text-white">Sign up</button>
+              <button onClick={() => exitDemo('signin')} className="ml-1 px-2.5 py-0.5 rounded-full border border-stone-600 text-stone-300 hover:text-white hover:border-stone-300">Exit demo</button>
+            </div>
+          </div>
+        )}
         <div className={`max-w-5xl mx-auto px-4 sm:px-6 ${isEmbed ? 'h-14' : 'h-[72px]'} flex justify-between items-center gap-3 md:gap-6`}>
           <button className="shrink-0 text-[26px] leading-none font-serif font-bold tracking-tight text-stone-900" onClick={() => setView(ViewState.DICTIONARY)}>
             LexiAI
@@ -371,7 +423,7 @@ const App: React.FC = () => {
             </button>
             <button
               onClick={() => setShowAccount(true)}
-              className={`${isEmbed ? 'hidden' : 'flex'} items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold uppercase tracking-wider transition-all ${
+              className={`${isEmbed || IS_DEMO ? 'hidden' : 'flex'} items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold uppercase tracking-wider transition-all ${
                 syncStatus === 'syncing' ? 'bg-amber-50 border-amber-100 text-amber-600' :
                 session ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-stone-100 border-stone-200 text-stone-400'
               }`}
@@ -380,7 +432,7 @@ const App: React.FC = () => {
               <span className="hidden sm:inline">{accountLabel}</span>
             </button>
             <button
-              onClick={() => setShowSettings(true)}
+              onClick={() => IS_DEMO ? showDemoNote('This is a demo — sign up to change settings and use your own API key.') : setShowSettings(true)}
               className="p-2 rounded-lg text-stone-400 hover:text-stone-900 transition-colors"
               title="Settings"
             >
@@ -388,7 +440,7 @@ const App: React.FC = () => {
             </button>
             <button
               onClick={() => setShowDebug(!showDebug)}
-              className={`hidden md:block p-2 rounded-lg transition-colors ${showDebug ? 'bg-stone-800 text-white' : 'text-stone-300 hover:text-stone-900'}`}
+              className={`hidden ${IS_DEMO ? '' : 'md:block'} p-2 rounded-lg transition-colors ${showDebug ? 'bg-stone-800 text-white' : 'text-stone-300 hover:text-stone-900'}`}
               title="Debug Sync"
             >
                <Terminal className="w-4 h-4" />
@@ -446,7 +498,10 @@ const App: React.FC = () => {
                   </button>
                 </div>
               ) : !isCloudConfigured ? (
-                <p className="text-stone-500 text-sm">Cloud sync is not configured. Add SUPABASE_URL and SUPABASE_KEY to your .env.local to enable accounts. Your words are stored safely in this browser meanwhile.</p>
+                <div className="space-y-4">
+                  <p className="text-stone-500 text-sm">Cloud sync is not configured. Add SUPABASE_URL and SUPABASE_KEY to your .env.local to enable accounts. Your words are stored safely in this browser meanwhile.</p>
+                  {tryDemoButton}
+                </div>
               ) : (
                 <form onSubmit={handleAuthSubmit} className="space-y-4">
                   <p className="text-stone-500 text-sm">
@@ -521,6 +576,7 @@ const App: React.FC = () => {
                       Forgot password?
                     </button>
                   )}
+                  {authMode !== 'forgot' && tryDemoButton}
                 </form>
               )}
               <input ref={importInputRef} type="file" accept="application/json" className="hidden" onChange={handleImportFile} />
@@ -587,6 +643,14 @@ const App: React.FC = () => {
         {view === ViewState.FLASHCARDS && <Flashcards words={savedWords} onReview={handleReview} onGameComplete={handleGameComplete} onSpellCorrect={handleSpellCorrect} newCardsToday={stats.daily.newCards ?? 0} />}
         {view === ViewState.PODCAST && <Podcasts words={savedWords} onUpdateWord={handleSaveWord} onOpenWord={(word) => { setDictLookup({ word, n: Date.now() }); setView(ViewState.DICTIONARY); }} />}
       </main>
+
+      {demoToast && (
+        <div className="fixed inset-x-0 bottom-24 md:bottom-8 z-[80] flex justify-center px-4 pointer-events-none">
+          <div role="status" className="max-w-md px-5 py-3 rounded-2xl bg-stone-900 text-white text-sm text-center shadow-2xl animate-fade-in-up">
+            {demoToast}
+          </div>
+        </div>
+      )}
 
       {/* Mobile bottom tab bar — the desktop nav above is hidden below md */}
       <nav

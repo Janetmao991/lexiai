@@ -2,6 +2,8 @@
 // Audio (transcription, natural voices, podcast audio) stays on Gemini: geminiService.ts.
 import { claudeJson, claudeChat, S, LexiPart } from "./claude";
 import { WordEntry, PracticeFeedback, NativeRephrase, ContextExplanation, PodcastScript, SynonymComparison, SentenceAnalysis, ContextMeaning } from "../types";
+import { IS_DEMO, DemoNoteError, DEMO_NOTE } from "./demo";
+import { demoLookupWord, demoExplainInContext, demoPickSense, demoTagSenses, demoCompare, demoAskLexi } from "./demoService";
 
 export { hasClaudeKey as hasApiKey, friendlyError } from "./claude";
 export type { LexiPart } from "./claude";
@@ -97,6 +99,7 @@ export const askAboutContext = async (
   question: string,
   history: { role: 'user' | 'model', text: string }[] = []
 ): Promise<string> => {
+  if (IS_DEMO) return `${DEMO_NOTE.replace('look up your own words', 'chat about your own sentences')} Try "Ask Lexi" (bottom right) for the sample questions.`;
   try {
     const reply = await claudeChat(
       [...history, { role: 'user' as const, text: question }].map(h => ({ role: h.role, parts: [{ text: h.text }] })),
@@ -144,6 +147,7 @@ export const askLexiTurn = async (
   history: { role: 'user' | 'model'; parts: LexiPart[] }[],
   parts: LexiPart[]
 ): Promise<string> => {
+  if (IS_DEMO) return demoAskLexi(parts.map(p => ('text' in p ? p.text : '')).join(' '));
   const reply = await claudeChat([...history, { role: 'user', parts }], { system: LEXI_PERSONA });
   return reply || 'Hmm, no answer came back — try rephrasing?';
 };
@@ -166,6 +170,7 @@ const imageAnalysisSchema = S.obj({
     a PDF, or a pasted text file — and pull out the advanced vocabulary worth learning.
     `source` is the attachment part(s): an inline image/PDF, or the file's plain text. */
 export const analyzeSource = async (source: LexiPart[]): Promise<ImageTextAnalysis> => {
+  if (IS_DEMO) throw new DemoNoteError('This is a demo — sign up to send your own photos and files.');
   const parsed = await claudeJson<ImageTextAnalysis>([
     ...source,
     { text: `Read the English text in the attachment above (a sentence, a paragraph, a page, or a whole document). You are helping an advanced learner (C1, Chinese native, business/finance focus) truly understand it.
@@ -183,6 +188,7 @@ If there is no readable English text, set explanation to "I couldn't find readab
 
 /** `opts.exact` — the learner insists on their own wording; never substitute a headword. */
 export const lookupWord = async (word: string, opts?: { exact?: boolean }): Promise<WordEntry | null> => {
+  if (IS_DEMO) return demoLookupWord(word, opts?.exact);
   const glossLang = getGlossLang();
   try {
     const data = await claudeJson<Omit<WordEntry, 'timestamp' | 'originalQuery'>>(`Act as a world-class lexicographer. Your goal is to provide accurate entries for advanced English learners.
@@ -251,6 +257,7 @@ Return:
 };
 
 export const analyzeContextFromText = async (word: string, fullText: string): Promise<ContextExplanation | null> => {
+  if (IS_DEMO) throw new DemoNoteError('This is a demo — sign up to add your own sentences.');
   try {
     return await claudeJson<ContextExplanation>(
       `Word: "${word}". Text: "${fullText.substring(0, 8000)}". Task: Find the sentence where "${word}" appears and explain its specific meaning.`,
@@ -278,6 +285,7 @@ export const generatePodcastScript = async (words: string[]): Promise<PodcastScr
 };
 
 export const compareSynonyms = async (word1: string, word2: string, word3?: string): Promise<SynonymComparison | null> => {
+  if (IS_DEMO) return demoCompare([word1, word2, word3].filter((w): w is string => Boolean(w)));
   try {
     return await claudeJson<SynonymComparison>(`Compare synonyms: ${word1}, ${word2}${word3 ? ', ' + word3 : ''}.`, synonymComparisonSchema);
   } catch (error) {
@@ -323,6 +331,7 @@ const contextMeaningSchema = (withGloss: boolean) => S.obj({
  * most likely to mislead (a familiar word used in an unfamiliar sense beats a merely rare word).
  */
 export const explainInContext = async (sentence: string, focus?: string): Promise<ContextMeaning | null> => {
+  if (IS_DEMO) return demoExplainInContext(sentence, focus);
   const glossLang = getGlossLang();
   const glossName = GLOSS_LANGS.find(g => g.id === glossLang)?.name || glossLang;
   return claudeJson<ContextMeaning>(`An advanced English learner (C1+) knows the common meanings of most words but gets confused when a sentence uses a word in a different sense. Sentence they are reading: "${sentence}"
@@ -346,6 +355,7 @@ Fill:
 
 /** Which sense of a dictionary entry a sentence uses — so a saved sentence can sit under its sense. */
 export const pickSense = async (entry: WordEntry, sentence: string, meaningHere: string): Promise<{ meaning: number; definition: number } | null> => {
+  if (IS_DEMO) return demoPickSense(entry, sentence);
   const senses = entry.meanings.flatMap((m, mi) =>
     m.definitions.map((d, di) => ({ mi, di, text: `${m.partOfSpeech}: ${d.definition}` })));
   if (senses.length === 0) return null;
@@ -361,6 +371,7 @@ ${senses.map((s, i) => `${i + 1}. ${s.text}`).join('\n')}`,
 
 /** Which sense each sentence uses — one call for a batch (e.g. podcast clips). null = no clear match. */
 export const tagSenses = async (entry: WordEntry, sentences: string[]): Promise<({ meaning: number; definition: number } | null)[]> => {
+  if (IS_DEMO) return demoTagSenses(entry, sentences);
   const senses = entry.meanings.flatMap((m, mi) =>
     m.definitions.map((d, di) => ({ mi, di, text: `${m.partOfSpeech}: ${d.definition}` })));
   if (senses.length === 0 || sentences.length === 0) return sentences.map(() => null);
@@ -384,6 +395,7 @@ ${sentences.map((s, i) => `[${i + 1}] ${s}`).join('\n')}`,
  * returns null when there is nothing to fill (gloss off, or every sense already has one).
  */
 export const fillGlosses = async (entry: WordEntry): Promise<WordEntry | null> => {
+  if (IS_DEMO) return null; // fixture entries already carry their glosses
   const lang = getGlossLang();
   if (!lang) return null;
   const missing = entry.meanings.flatMap((m, mi) =>

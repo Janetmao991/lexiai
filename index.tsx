@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { registerSW } from 'virtual:pwa-register';
 import App from './App.tsx';
 import { localStorageService } from './services/localStorageService.ts';
+import { IS_DEMO, loadDemoFixture } from './services/demo.ts';
 
 // Auto-adopt new deployments: with registerType 'autoUpdate' the page reloads
 // as soon as a fresh service worker takes control; also re-check hourly so
@@ -17,10 +18,13 @@ if (!container) {
 }
 
 // Load the notebook from IndexedDB first so the app's first render already has it.
-localStorageService.init().finally(() => {
-  createRoot(container).render(
-    <React.StrictMode>
-      <App />
-    </React.StrictMode>
-  );
-});
+// Demo mode (?demo=1) first fetches its bundled sample content, which the notebook is seeded from.
+(IS_DEMO ? loadDemoFixture() : Promise.resolve())
+  .then(() => localStorageService.init())
+  .finally(() => {
+    createRoot(container).render(
+      <React.StrictMode>
+        <App />
+      </React.StrictMode>
+    );
+  });

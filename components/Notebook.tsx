@@ -5,6 +5,7 @@ import { analyzeContextFromText, askAboutContext, fillGlosses } from '../service
 import { playPronunciation } from '../services/geminiService';
 import { srsService, MASTERY_META } from '../services/srsService';
 import { ipaLabel, senseLabel } from '../services/format';
+import { isDemoNote } from '../services/demo';
 import { Trash2, Book, ArrowRight, ChevronDown, Plus, Loader2, X, RefreshCw, Search, Volume2, MessageSquare, Send, Sparkles, BookOpen } from 'lucide-react';
 
 interface Message {
@@ -95,7 +96,7 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onUpdateWor
         setNewContextText('');
         setAddingContextFor(null);
     } catch (e) {
-        setErrorMsg("Failed to analyze text.");
+        setErrorMsg(isDemoNote(e) ? e.message : "Failed to analyze text.");
     } finally {
         setIsAnalyzing(false);
     }

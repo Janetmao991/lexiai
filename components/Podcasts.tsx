@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { WordEntry, UserContext } from '../types';
-import { supabase } from '../services/supabaseClient';
-import { wordsWithClips, PodcastClip, formatTime } from '../services/podcastService';
+import { libraryAvailable, wordsWithClips, PodcastClip, formatTime } from '../services/podcastService';
 import { PodcastClips } from './PodcastClips';
 import { fillGlosses } from '../services/claudeService';
 import { ChevronDown, Loader2, Search, Headphones, ArrowRight } from 'lucide-react';
@@ -29,9 +28,7 @@ export const Podcasts: React.FC<PodcastsProps> = ({ words, onUpdateWord, onOpenW
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!supabase) { setStatus('signedOut'); return; }
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) { if (!cancelled) setStatus('signedOut'); return; }
+      if (!(await libraryAvailable())) { if (!cancelled) setStatus('signedOut'); return; }
       try {
         const found = await wordsWithClips(words.map(w => w.word));
         if (!cancelled) { setCounts(found); setStatus('ready'); }

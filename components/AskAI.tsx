@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { askLexiTurn, analyzeSource, hasApiKey, ImageWordPick, LexiPart } from '../services/claudeService';
+import { IS_DEMO, isDemoNote, demoFixture } from '../services/demo';
 import { Sparkles, X, Send, Loader2, Eraser, ImagePlus, Search, Paperclip, Upload, FileText } from 'lucide-react';
 
 interface Msg {
@@ -216,14 +217,15 @@ export const AskAI: React.FC<AskAIProps> = ({ onLookup }) => {
 
   const friendlyError = (e: any) => {
     const raw = String(e?.message || '');
+    if (isDemoNote(e)) return raw;
     return /API key/i.test(raw) ? 'No API key configured — open Settings (gear icon) first.'
       : /429|quota|RESOURCE_EXHAUSTED/i.test(raw) ? 'Rate limit reached — wait a minute and try again.'
       : /503|overloaded/i.test(raw) ? 'The AI service is briefly overloaded — try again in a few seconds.'
       : 'Something went wrong — please try again.';
   };
 
-  const send = async () => {
-    const q = input.trim();
+  const send = async (override?: string) => {
+    const q = (override ?? input).trim();
     if (busy || (!q && !pending)) return;
     setInput('');
     setError(null);
@@ -332,7 +334,21 @@ export const AskAI: React.FC<AskAIProps> = ({ onLookup }) => {
           </div>
 
           <div ref={bodyRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-3 min-h-[10rem]">
-            {messages.length === 0 && !busy && (
+            {messages.length === 0 && !busy && IS_DEMO && (
+              <div className="text-sm space-y-2 pt-2">
+                <p className="text-stone-400 font-serif italic">Demo — tap a sample question:</p>
+                {demoFixture().suggestions.ask.map(q => (
+                  <button
+                    key={q}
+                    onClick={() => send(q)}
+                    className="w-full text-left px-3.5 py-2.5 bg-white border border-stone-200 rounded-xl text-stone-800 hover:border-stone-900 transition-colors"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            )}
+            {messages.length === 0 && !busy && !IS_DEMO && (
               <div className="text-sm text-stone-400 font-serif italic space-y-2 pt-2">
                 <p>Ask me anything, e.g.:</p>
                 <p>· what does "hedge" mean here?</p>

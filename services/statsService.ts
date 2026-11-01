@@ -2,8 +2,11 @@ import { UserStats, DailyProgress, WordEntry, UserPrefs } from '../types';
 import { srsService, todayStr, daysFromToday } from './srsService';
 import { supabase } from './supabaseClient';
 import { GLOSS_STORAGE } from './claudeService';
+import { IS_DEMO, demoStore, demoFixture } from './demo';
 
 const STATS_KEY = 'lexiai_stats_v1';
+// Demo progress (seeded from the fixture) lives in this tab only.
+const kv = IS_DEMO ? demoStore : localStorage;
 
 export type ActivityEvent = 'review' | 'practice' | 'practiceHigh' | 'save' | 'podcast' | 'speaking' | 'game';
 
@@ -95,8 +98,9 @@ let currentUserId: string | null = null;
 
 const load = (): UserStats => {
   try {
-    const raw = localStorage.getItem(STATS_KEY);
-    const stats: UserStats = raw ? { ...defaultStats(), ...JSON.parse(raw) } : defaultStats();
+    const raw = kv.getItem(STATS_KEY);
+    const fallback = IS_DEMO ? structuredClone(demoFixture().stats) : defaultStats();
+    const stats: UserStats = raw ? { ...defaultStats(), ...JSON.parse(raw) } : fallback;
     if (stats.daily.date !== todayStr()) stats.daily = emptyDaily();
     return stats;
   } catch {
@@ -105,7 +109,7 @@ const load = (): UserStats => {
 };
 
 const persist = (stats: UserStats) => {
-  localStorage.setItem(STATS_KEY, JSON.stringify(stats));
+  kv.setItem(STATS_KEY, JSON.stringify(stats));
   listeners.forEach(l => l(stats));
   if (currentUserId && supabase) {
     if (cloudPushTimer) clearTimeout(cloudPushTimer);
