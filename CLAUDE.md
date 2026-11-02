@@ -42,5 +42,8 @@ Owner: Janet — self-taught builder. Explain non-obvious technical choices in p
 - At the end of a work session, update "Current status" below (3–5 lines max).
 
 ## Current status
-- Recent focus: podcast clips ("Heard in podcasts") on the Define page; Look up redesign (Word/Sentence modes).
+- 2026-10-26: all text features moved to Claude (BYOK key in Settings); Gemini only for audio. Same switch in lexispeak.
+  Pushed on branch `redesign-lookup` (not merged to main yet). Janet still needs to paste her Claude key in Settings.
+- Earlier focus: podcast clips ("Heard in podcasts") on the Define page; Look up redesign (Word/Sentence modes).
 - Backfill finished (data/backfill.done). Nightly job adds 1 archive episode per everyday show.
+- Writing Station now has its own private GitHub repo (Janetmao991/writing-station).
