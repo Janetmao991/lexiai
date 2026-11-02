@@ -20,7 +20,24 @@ type DictionaryMode = 'DEFINE' | 'CONTEXT' | 'COMPARE';
 const normalizeForm = (s: string) =>
   s.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[.!?,;:]+$/, '');
 
-const IS_EMBED = new URLSearchParams(window.location.search).has('embed');
+/** Words that are never what a learner is looking up — pronouns, auxiliaries, articles, prepositions. */
+const FUNCTION_WORDS = new Set(('i me my you your he him his she her it its we us our they them their this that these those ' +
+  'a an the am is are was were be been being do does did have has had will would shall should can could may might must ' +
+  'to of in on at by for with from up out as and or but so if not no than then there here what which who whom whose ' +
+  'just very really also too').split(' '));
+
+/** The content words in a multi-word query, in order, so the learner can pick the one they meant. */
+const pickableWords = (q: string): string[] => {
+  const tokens = q.trim().split(/\s+/);
+  if (tokens.length < 2) return [];
+  const seen = new Set<string>();
+  return tokens
+    .map(t => t.replace(/[’]/g, "'").replace(/^[^A-Za-z]+|[^A-Za-z]+$/g, '').replace(/'(m|s|re|ve|ll|d|t)$/i, ''))
+    .filter(w => w.length > 1 && !FUNCTION_WORDS.has(w.toLowerCase()) && !w.toLowerCase().endsWith("n't"))
+    .filter(w => !seen.has(w.toLowerCase()) && seen.add(w.toLowerCase()));
+};
+
+const IS_EMBED =new URLSearchParams(window.location.search).has('embed');
 
 
 /**
@@ -386,6 +403,23 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
               {loading ? <Loader2 className="animate-spin w-5 h-5" /> : <ArrowRight className="w-5 h-5" />}
             </button>
           </form>
+
+          {/* Several words typed → offer each real word on its own, so "I'm compelled to" can go straight to "compelled". */}
+          {pickableWords(query).length > 0 && !loading && (
+            <div className="-mt-4 flex flex-wrap items-center gap-2 animate-fade-in">
+              <span className="text-xs text-[#8C8880] mr-1">Just one word?</span>
+              {pickableWords(query).map(w => (
+                <button
+                  key={w}
+                  type="button"
+                  onClick={() => doLookup(w)}
+                  className="min-h-[32px] px-3.5 rounded-full border border-[#E2DDD2] font-serif text-[15px] text-[#2B2A27] hover:border-stone-900 transition-colors"
+                >
+                  {w}
+                </button>
+              ))}
+            </div>
+          )}
 
           {lookupResult && (
             <article className={`${card} animate-fade-in-up px-5 sm:px-16 py-9 sm:py-14 space-y-10 sm:space-y-12`}>
