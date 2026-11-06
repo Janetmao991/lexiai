@@ -43,7 +43,7 @@ Owner: Janet — self-taught builder. Explain non-obvious technical choices in p
 
 ## Current status
 - 2026-11-06: Look up lists every part of speech (finance senses added, not substituted); "Refresh senses" on Notebook
-  words; Sentence mode auto-fixes typos ("Keep as typed" to undo). Pushed on `redesign-lookup`, not merged to main.
+  words; Sentence mode auto-fixes typos ("Keep as typed" to undo). Merged to main and live on Vercel.
   Next idea (designed, not built): "My fields" setting — Finance + AI/Tech specialist senses, tagged per field.
 - 2026-10-26: all text features moved to Claude (BYOK key in Settings); Gemini only for audio. Same switch in lexispeak.
 - Earlier focus: podcast clips ("Heard in podcasts") on the Define page; Look up redesign (Word/Sentence modes).
