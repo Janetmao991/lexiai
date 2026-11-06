@@ -42,5 +42,10 @@ Owner: Janet — self-taught builder. Explain non-obvious technical choices in p
 - At the end of a work session, update "Current status" below (3–5 lines max).
 
 ## Current status
-- Recent focus: podcast clips ("Heard in podcasts") on the Define page; Look up redesign (Word/Sentence modes).
+- 2026-11-06: Look up lists every part of speech (finance senses added, not substituted); "Refresh senses" on Notebook
+  words; Sentence mode auto-fixes typos ("Keep as typed" to undo). Pushed on `redesign-lookup`, not merged to main.
+  Next idea (designed, not built): "My fields" setting — Finance + AI/Tech specialist senses, tagged per field.
+- 2026-10-26: all text features moved to Claude (BYOK key in Settings); Gemini only for audio. Same switch in lexispeak.
+- Earlier focus: podcast clips ("Heard in podcasts") on the Define page; Look up redesign (Word/Sentence modes).
 - Backfill finished (data/backfill.done). Nightly job adds 1 archive episode per everyday show.
+- Writing Station now has its own private GitHub repo (Janetmao991/writing-station).

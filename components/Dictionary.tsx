@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { WordEntry, SynonymComparison, ContextMeaning, UserContext } from '../types';
-import { lookupWord, compareSynonyms, explainInContext, pickSense, fillGlosses } from '../services/claudeService';
+import { lookupWord, compareSynonyms, explainInContext, pickSense, tagSenses, fillGlosses } from '../services/claudeService';
 import { playPronunciation } from '../services/geminiService';
 import { ipaLabel, senseLabel } from '../services/format';
 import { preparePronunciation } from '../services/pronunciation';
 import { IS_DEMO, isDemoNote, showDemoNote, demoFixture } from '../services/demo';
-import { Search, Volume2, Loader2, GitCompare, Sparkles, Check, Save, Bookmark, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Search, Volume2, Loader2, GitCompare, Sparkles, Check, Save, Bookmark, ArrowRight, ArrowLeft, RefreshCw } from 'lucide-react';
 
 interface DictionaryProps {
   onSave: (word: WordEntry) => void;
@@ -21,7 +21,24 @@ type DictionaryMode = 'DEFINE' | 'CONTEXT' | 'COMPARE';
 const normalizeForm = (s: string) =>
   s.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[.!?,;:]+$/, '');
 
-const IS_EMBED = new URLSearchParams(window.location.search).has('embed');
+/** Words that are never what a learner is looking up — pronouns, auxiliaries, articles, prepositions. */
+const FUNCTION_WORDS = new Set(('i me my you your he him his she her it its we us our they them their this that these those ' +
+  'a an the am is are was were be been being do does did have has had will would shall should can could may might must ' +
+  'to of in on at by for with from up out as and or but so if not no than then there here what which who whom whose ' +
+  'just very really also too').split(' '));
+
+/** The content words in a multi-word query, in order, so the learner can pick the one they meant. */
+const pickableWords = (q: string): string[] => {
+  const tokens = q.trim().split(/\s+/);
+  if (tokens.length < 2) return [];
+  const seen = new Set<string>();
+  return tokens
+    .map(t => t.replace(/[’]/g, "'").replace(/^[^A-Za-z]+|[^A-Za-z]+$/g, '').replace(/'(m|s|re|ve|ll|d|t)$/i, ''))
+    .filter(w => w.length > 1 && !FUNCTION_WORDS.has(w.toLowerCase()) && !w.toLowerCase().endsWith("n't"))
+    .filter(w => !seen.has(w.toLowerCase()) && seen.add(w.toLowerCase()));
+};
+
+const IS_EMBED =new URLSearchParams(window.location.search).has('embed');
 
 
 /**
@@ -63,6 +80,13 @@ const emphasize = (text: string, word: string): React.ReactNode => {
     i % 2 === 1 ? <b key={i} className="font-medium text-stone-900">{part}</b> : part);
 };
 
+/** Word-by-word list of what the typo fix changed; null when the word count differs (show the whole original instead). */
+const typoChanges = (from: string, to: string): { from: string; to: string }[] | null => {
+  const a = from.trim().split(/\s+/), b = to.trim().split(/\s+/);
+  if (a.length !== b.length) return null;
+  return a.map((w, i) => ({ from: w, to: b[i] })).filter(c => c.from !== c.to);
+};
+
 /** Split a sentence around the explained phrase so every other word stays tappable. */
 const splitAround = (sentence: string, surface: string) => {
   const at = surface ? sentence.toLowerCase().indexOf(surface.toLowerCase()) : -1;
@@ -90,6 +114,10 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
   const [contextResult, setContextResult] = useState<ContextMeaning | null>(null);
   const [contextSave, setContextSave] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [savedSense, setSavedSense] = useState<string>('');
+  /** The sentence as the learner typed it, when Claude fixed typos in it ('' = nothing fixed). */
+  const [typoFixedFrom, setTypoFixedFrom] = useState('');
+  /** The learner chose "Keep as typed" — don't correct this sentence again while they tap words in it. */
+  const [asTyped, setAsTyped] = useState(false);
 
   // Compare
   const [compareInputs, setCompareInputs] = useState(['', '', '']);
@@ -149,18 +177,68 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
     }
   };
 
-  const runContext = async (sentence: string, focus?: string) => {
+  /** A Notebook word keeps the entry it was saved with. Re-ask Claude for its senses
+   *  (e.g. a part of speech that was missing), keeping review progress and saved sentences,
+   *  which are re-filed under the matching new sense. */
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshSenses = async () => {
+    const saved = lookupResult && savedEntry(lookupResult.word);
+    if (!saved) return;
+    setRefreshing(true);
+    setError('');
+    try {
+      const fresh = await lookupWord(saved.word, { exact: true });
+      if (!fresh) throw new Error('No dictionary entry');
+      const ctx = saved.contexts || [];
+      const tags = ctx.length
+        ? await tagSenses(fresh, ctx.map(c => c.targetSentence || c.fullText)).catch(() => ctx.map(() => null))
+        : [];
+      const updated: WordEntry = {
+        ...saved,
+        ipa: fresh.ipa,
+        meanings: fresh.meanings,
+        variants: fresh.variants,
+        contexts: ctx.map((c, i) => {
+          const { sense: _old, ...rest } = c;
+          return tags[i] ? { ...rest, sense: tags[i]! } : rest;
+        }),
+      };
+      onSave(updated);
+      setLookupResult({ ...updated, originalQuery: lookupResult!.originalQuery });
+    } catch (err: any) {
+      showError(err, 'Could not refresh this word. Please try again.');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const runContext = async (sentence: string, focus?: string, keepTyped?: boolean) => {
     if (!sentence.trim()) return;
+    const typed = sentence.trim();
+    // Tapping a word re-runs the same (already corrected) sentence — keep the typo note and choice.
+    const sameSentence = typed === contextSentence && !!contextResult;
+    const literal = keepTyped ?? (sameSentence && asTyped);
     setActiveMode('CONTEXT');
     setContextInput(sentence);
-    setContextSentence(sentence.trim());
+    setContextSentence(typed);
     setContextResult(null);
     setContextSave('idle');
+    if (!sameSentence) setTypoFixedFrom('');
+    setAsTyped(literal);
     setLoading(true);
     setError('');
     try {
-      const data = await explainInContext(sentence.trim(), focus);
-      if (data) setContextResult(data);
+      const data = await explainInContext(typed, focus, { asTyped: literal });
+      if (data) {
+        // Claude fixed typos: work with (and later save) the clean sentence.
+        const fixed = data.correctedSentence?.trim();
+        if (!literal && fixed && fixed !== typed) {
+          setContextSentence(fixed);
+          setContextInput(fixed);
+          setTypoFixedFrom(typed);
+        }
+        setContextResult(data);
+      }
       else setError('Could not explain this sentence.');
     } catch (err: any) {
       showError(err, 'Failed to explain the sentence. Please try again.');
@@ -419,6 +497,23 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
 
           {demoNoteBox}
 
+          {/* Several words typed → offer each real word on its own, so "I'm compelled to" can go straight to "compelled". */}
+          {pickableWords(query).length > 0 && !loading && (
+            <div className="-mt-4 flex flex-wrap items-center gap-2 animate-fade-in">
+              <span className="text-xs text-[#8C8880] mr-1">Just one word?</span>
+              {pickableWords(query).map(w => (
+                <button
+                  key={w}
+                  type="button"
+                  onClick={() => doLookup(w)}
+                  className="min-h-[32px] px-3.5 rounded-full border border-[#E2DDD2] font-serif text-[15px] text-[#2B2A27] hover:border-stone-900 transition-colors"
+                >
+                  {w}
+                </button>
+              ))}
+            </div>
+          )}
+
           {lookupResult && (
             <article className={`${card} animate-fade-in-up px-5 sm:px-16 py-9 sm:py-14 space-y-10 sm:space-y-12`}>
               <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
@@ -448,16 +543,29 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
                     </p>
                   )}
                 </div>
+                <div className="self-start sm:self-auto flex flex-col items-start sm:items-end gap-1.5">
                 <button
                   onClick={() => onSave(lookupResult)}
                   disabled={isSaved(lookupResult.word)}
-                  className={`self-start sm:self-auto flex items-center gap-2.5 min-h-[46px] px-5 rounded-full text-sm font-medium transition-colors ${
+                  className={`flex items-center gap-2.5 min-h-[46px] px-5 rounded-full text-sm font-medium transition-colors ${
                     isSaved(lookupResult.word) ? 'bg-[#F3EFE6] text-[#55524C] cursor-default' : 'bg-stone-900 text-[#FBF9F4] hover:bg-black'
                   }`}
                 >
                   <Bookmark className={`w-4 h-4 ${isSaved(lookupResult.word) ? 'fill-current' : ''}`} />
                   {isSaved(lookupResult.word) ? 'In Notebook' : 'Save to Notebook'}
                 </button>
+                {isSaved(lookupResult.word) && (
+                  <button
+                    onClick={refreshSenses}
+                    disabled={refreshing}
+                    title="Ask again for this word's senses — your saved sentences and review progress stay"
+                    className="flex items-center gap-1.5 min-h-[32px] px-1 text-xs text-[#8C8880] hover:text-stone-900 disabled:opacity-60"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+                    {refreshing ? 'Refreshing…' : 'Refresh senses'}
+                  </button>
+                )}
+                </div>
               </header>
 
               {/* Reverse-lookup candidates (Chinese/description queries) — closest first, click to look up */}
@@ -592,6 +700,25 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
                     )}
                     {tappable(after)}
                   </p>
+                  {typoFixedFrom && (() => {
+                    const changes = typoChanges(typoFixedFrom, contextSentence);
+                    return (
+                      <p className="text-sm text-[#8C8880]">
+                        Fixed {changes && changes.length === 1 ? 'a typo' : 'typos'}:{' '}
+                        {changes && changes.length > 0
+                          ? changes.map((c, i) => (
+                              <span key={i}>{i > 0 && ', '}<s className="text-[#B5AFA3]">{c.from}</s> → <span className="text-[#55524C]">{c.to}</span></span>
+                            ))
+                          : <s className="text-[#B5AFA3]">{typoFixedFrom}</s>}
+                        <button
+                          onClick={() => { const t = typoFixedFrom; setTypoFixedFrom(''); runContext(t, undefined, true); }}
+                          className="ml-3 text-[#55524C] underline underline-offset-4 hover:text-stone-900"
+                        >
+                          Keep as typed
+                        </button>
+                      </p>
+                    );
+                  })()}
                   <p className="font-serif italic text-sm text-[#8C8880]">Tap any word to check it in this sentence</p>
                 </div>
 

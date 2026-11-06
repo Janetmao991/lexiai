@@ -195,12 +195,14 @@ export const lookupWord = async (word: string, opts?: { exact?: boolean }): Prom
 
       CRITICAL ACCURACY CHECK:
       The user input is: "${word}".
+      0. FIND THE WORD: The input may be a fragment copied from a sentence, with pronouns, auxiliaries or a dangling preposition around the expression the learner actually wants ("I'm compelled to", "she was reluctant", "they've been grappling with"). Use the learnable word or set phrase inside it as the headword, in dictionary form, keeping a preposition only when it belongs to the pattern ("be compelled to", "reluctant", "grapple with"). Never make a pronoun, contraction, auxiliary or function word the headword when the input contains a content word. This is not a correction: leave "wasCorrected" false, and do not list the fragment itself in "variants".
       1. Correct the input ONLY when it is a genuine error: a misspelling, or a malapropism ("for all intensive purposes" → "for all intents and purposes"). A term that is actually used in finance, business or tech is NOT an error however unusual it looks — keep it EXACTLY as typed, word order included. "lead left" is a real syndicate/IPO term and must never be turned into "left lead". Never reorder, re-hyphenate or otherwise tidy a phrase just to make it look more familiar, and when you are unsure whether a form is attested, keep the learner's form as the headword and explain its status in the definition.
       2. If you correct it, set "wasCorrected" to true.${opts?.exact ? `
       OVERRIDE — the learner has already been shown a different headword and has asked for "${word}" exactly as typed: use it verbatim as the headword, set "wasCorrected" to false, and if it is rare, informal or non-standard, say so inside the first definition instead of substituting another form.` : ''}
       3. Provide IPA, detailed meanings, and advanced usage examples.
       4. ESSENTIAL: Provide 4-6 natural collocations for each definition.
-      5. FINANCIAL FOCUS: If the word has a specific meaning in Finance, Business, or Economics, ENSURE you include that definition and set the partOfSpeech to exactly "Noun (Finance)", "Verb (Finance)", etc.${glossInstruction(glossLang)}
+      5. COVER EVERY PART OF SPEECH: Give one "meanings" item for EACH part of speech the word is commonly used as (e.g. "churn" is both a verb — customers churn, churn butter — and a noun — customer churn). Never drop a common part of speech because another one seems more important. Within each, list the main senses, most common first.
+      5a. FINANCIAL FOCUS: If the word ALSO has a specific meaning in Finance, Business, or Economics, ENSURE you include it — as its own "meanings" item with partOfSpeech exactly "Noun (Finance)", "Verb (Finance)", etc. — in addition to the general senses, never instead of them. If the finance sense exists as both a noun and a verb, give both.${glossInstruction(glossLang)}
       6. REVERSE LOOKUP: The input may be CHINESE (or an English description of a meaning) instead of an English word. In that case, pick the single closest English word/phrase as the headword and fill "candidates" with 2-3 OTHER English words that also express it, ordered closest-in-meaning first, each with a one-line "nuance" explaining when it fits better than the headword. For a normal English-word lookup, leave "candidates" as [].
       7. VARIANT NOTES: Fill "variants" with the forms most easily confused with the headword — the same words with a different article, preposition, or number (e.g. for "at the margin": "on margin", "on the margins", "in the margin"). 2-4 items, each with "form" = the exact form and "note" = ONE line on how its meaning or register differs from the headword. Never repeat the headword itself, and never list a form that means exactly the same thing with no difference in register. If the input "${word}" is an English expression that you did NOT use verbatim as the headword, its own form MUST be the first item, saying plainly whether it is a true synonym, a looser or more colloquial variant, or a different expression altogether. If nothing is genuinely confusable, leave "variants" as [].`,
       dictionarySchema(Boolean(glossLang)));
@@ -311,6 +313,7 @@ export const analyzeSentence = async (sentence: string): Promise<SentenceAnalysi
 // ---- Meaning in context ----
 
 const contextMeaningSchema = (withGloss: boolean) => S.obj({
+  correctedSentence: S.str(),
   word: S.str(),
   surface: S.str(),
   meaningHere: S.str(),
@@ -322,7 +325,7 @@ const contextMeaningSchema = (withGloss: boolean) => S.obj({
     usualGloss: S.str(),
     paraphraseGloss: S.str(),
   } : {}),
-}, ["word", "surface", "meaningHere", "usualMeaning", "clues", "paraphrase",
+}, ["correctedSentence", "word", "surface", "meaningHere", "usualMeaning", "clues", "paraphrase",
   ...(withGloss ? ["glossHere", "paraphraseGloss"] : [])]);
 
 /**
@@ -330,7 +333,7 @@ const contextMeaningSchema = (withGloss: boolean) => S.obj({
  * with the sense a learner probably already knows. With no `focus`, the model picks the item
  * most likely to mislead (a familiar word used in an unfamiliar sense beats a merely rare word).
  */
-export const explainInContext = async (sentence: string, focus?: string): Promise<ContextMeaning | null> => {
+export const explainInContext = async (sentence: string, focus?: string, opts?: { asTyped?: boolean }): Promise<ContextMeaning | null> => {
   if (IS_DEMO) return demoExplainInContext(sentence, focus);
   const glossLang = getGlossLang();
   const glossName = GLOSS_LANGS.find(g => g.id === glossLang)?.name || glossLang;
@@ -341,11 +344,12 @@ ${focus
   : `Pick the ONE word or expression in this sentence most likely to mislead them: prefer a familiar word used in a less common sense (e.g. "coup" meaning a big win, "gauge" meaning to estimate) over a word that is merely rare. Phrasal verbs and idioms count as one item.`}
 
 Fill:
+- correctedSentence: ${opts?.asTyped ? 'the sentence EXACTLY as given — the learner wants to keep their own wording, so fix nothing.' : 'the sentence with genuine typos fixed'} — misspellings, a missing or doubled letter, a wrong word that is clearly a slip ("slippery slop" → "slippery slope", "their going" → "they're going"). Change NOTHING else: keep the wording, word order, punctuation, casing, style and any informal or non-standard but intentional usage. If there are no typos, return the sentence exactly as given. Everything below is about correctedSentence; never mention the typos anywhere else (not in meaningHere, usualMeaning or clues).
 - word: its dictionary headword (base form, e.g. "gauges" → "gauge").
-- surface: the exact text as it appears in the sentence.
+- surface: the exact text as it appears in correctedSentence.
 - meaningHere: the sense used in THIS sentence, as a clear dictionary-style definition (one sentence).
 - usualMeaning: the more common sense this learner probably knows, in a few words — but ONLY if it differs from meaningHere; otherwise "".
-- clues: 1-3 items. "quote" = a short verbatim fragment of the sentence (use "…" to skip words) that signals this sense; "why" = a few plain words on what it tells you (e.g. "business, not politics").
+- clues: 1-3 items. "quote" = a short verbatim fragment of correctedSentence (use "…" to skip words) that signals this sense; "why" = a few plain words on what it tells you (e.g. "business, not politics").
 - paraphrase: the whole sentence restated in plain, simple English.${glossLang ? `
 - glossHere: a ${glossName} gloss of meaningHere (5-15 characters, "；"-separated).
 - usualGloss: a ${glossName} gloss of usualMeaning, or "" if usualMeaning is "".

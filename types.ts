@@ -27,6 +27,8 @@ export interface UserContext {
 
 /** "Meaning in context": what a word means in one specific sentence. */
 export interface ContextMeaning {
+  /** The sentence with genuine typos fixed (identical to the input when there were none). */
+  correctedSentence?: string;
   /** Dictionary headword form (lemma / base phrase) of the focus item. */
   word: string;
   /** The exact text as it appears in the sentence. */
