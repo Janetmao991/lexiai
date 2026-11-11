@@ -42,6 +42,9 @@ Owner: Janet — self-taught builder. Explain non-obvious technical choices in p
 - At the end of a work session, update "Current status" below (3–5 lines max).
 
 ## Current status
+- 2026-11-11: Look up streams — the entry appears as Claude writes it, played back at an even pace
+  (`claudeJsonStream` in `services/claude.ts`). On branch `faster-lookup`, not merged or deployed yet.
+  Untried speed options: fast mode (2x price), or Sonnet/Haiku for lookups.
 - 2026-11-06: Look up lists every part of speech (finance senses added, not substituted); "Refresh senses" on Notebook
   words; Sentence mode auto-fixes typos ("Keep as typed" to undo). Merged to main and live on Vercel.
   Next idea (designed, not built): "My fields" setting — Finance + AI/Tech specialist senses, tagged per field.
