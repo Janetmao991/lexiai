@@ -1,6 +1,6 @@
 // Every text feature in LexiAI (lookups, feedback, chat, analysis) — powered by Claude.
 // Audio (transcription, natural voices, podcast audio) stays on Gemini: geminiService.ts.
-import { claudeJson, claudeChat, S, LexiPart } from "./claude";
+import { claudeJson, claudeJsonStream, claudeChat, S, LexiPart } from "./claude";
 import { WordEntry, PracticeFeedback, NativeRephrase, ContextExplanation, PodcastScript, SynonymComparison, SentenceAnalysis, ContextMeaning } from "../types";
 import { IS_DEMO, DemoNoteError, DEMO_NOTE } from "./demo";
 import { demoLookupWord, demoExplainInContext, demoPickSense, demoTagSenses, demoCompare, demoAskLexi } from "./demoService";
@@ -186,12 +186,32 @@ If there is no readable English text, set explanation to "I couldn't find readab
   return parsed || { explanation: 'Hmm, no answer came back — try again?', breakdown: [], words: [] };
 };
 
-/** `opts.exact` — the learner insists on their own wording; never substitute a headword. */
-export const lookupWord = async (word: string, opts?: { exact?: boolean }): Promise<WordEntry | null> => {
+/** Tidy a half-written entry so the page can draw it: keep only senses whose definition
+ *  text has arrived, and default the lists that haven't. Null until the headword is in. */
+const draftEntry = (raw: unknown, query: string): WordEntry | null => {
+  const r = raw as Partial<WordEntry> | null;
+  // The headword is only complete once the next field ("ipa") has started.
+  if (!r || typeof r.word !== 'string' || !r.word || typeof r.ipa !== 'string') return null;
+  const meanings = (Array.isArray(r.meanings) ? r.meanings : [])
+    .filter(m => m && typeof m.partOfSpeech === 'string')
+    .map(m => ({
+      partOfSpeech: m.partOfSpeech,
+      definitions: (Array.isArray(m.definitions) ? m.definitions : [])
+        .filter(d => d && typeof d.definition === 'string')
+        .map(d => ({ ...d, synonyms: d.synonyms || [], examples: d.examples || [], collocations: d.collocations || [] })),
+    }))
+    .filter(m => m.definitions.length > 0);
+  // "candidates" and "variants" are written last and may be half-filled — they wait for the finished entry.
+  return { word: r.word, ipa: r.ipa || '', wasCorrected: r.wasCorrected, meanings, timestamp: Date.now(), originalQuery: query } as WordEntry;
+};
+
+/** `opts.exact` — the learner insists on their own wording; never substitute a headword.
+ *  `opts.onDraft` — called with the entry-so-far while Claude is still writing it. */
+export const lookupWord = async (word: string, opts?: { exact?: boolean; onDraft?: (draft: WordEntry) => void }): Promise<WordEntry | null> => {
   if (IS_DEMO) return demoLookupWord(word, opts?.exact);
   const glossLang = getGlossLang();
   try {
-    const data = await claudeJson<Omit<WordEntry, 'timestamp' | 'originalQuery'>>(`Act as a world-class lexicographer. Your goal is to provide accurate entries for advanced English learners.
+    const prompt = `Act as a world-class lexicographer. Your goal is to provide accurate entries for advanced English learners.
 
       CRITICAL ACCURACY CHECK:
       The user input is: "${word}".
@@ -205,8 +225,13 @@ export const lookupWord = async (word: string, opts?: { exact?: boolean }): Prom
       5a. ORDER BY HOW COMMON IT IS TODAY: Order the "meanings" items (finance ones included) by how often an educated adult meets that use in today's English — news, business, work and everyday conversation — most common first, not by historical or "literal first" order. E.g. for "churn", customer churn (noun) and customers churning (verb) come before making butter.
       5b. FINANCIAL FOCUS: If the word ALSO has a specific meaning in Finance, Business, or Economics, ENSURE you include it — as its own "meanings" item with partOfSpeech exactly "Noun (Finance)", "Verb (Finance)", etc. — in addition to the general senses, never instead of them. If the finance sense exists as both a noun and a verb, give both.${glossInstruction(glossLang)}
       6. REVERSE LOOKUP: The input may be CHINESE (or an English description of a meaning) instead of an English word. In that case, pick the single closest English word/phrase as the headword and fill "candidates" with 2-3 OTHER English words that also express it, ordered closest-in-meaning first, each with a one-line "nuance" explaining when it fits better than the headword. For a normal English-word lookup, leave "candidates" as [].
-      7. VARIANT NOTES: Fill "variants" with the forms most easily confused with the headword — the same words with a different article, preposition, or number (e.g. for "at the margin": "on margin", "on the margins", "in the margin"). 2-4 items, each with "form" = the exact form and "note" = ONE line on how its meaning or register differs from the headword. Never repeat the headword itself, and never list a form that means exactly the same thing with no difference in register. If the input "${word}" is an English expression that you did NOT use verbatim as the headword, its own form MUST be the first item, saying plainly whether it is a true synonym, a looser or more colloquial variant, or a different expression altogether. If nothing is genuinely confusable, leave "variants" as [].`,
-      dictionarySchema(Boolean(glossLang)));
+      7. VARIANT NOTES: Fill "variants" with the forms most easily confused with the headword — the same words with a different article, preposition, or number (e.g. for "at the margin": "on margin", "on the margins", "in the margin"). 2-4 items, each with "form" = the exact form and "note" = ONE line on how its meaning or register differs from the headword. Never repeat the headword itself, and never list a form that means exactly the same thing with no difference in register. If the input "${word}" is an English expression that you did NOT use verbatim as the headword, its own form MUST be the first item, saying plainly whether it is a true synonym, a looser or more colloquial variant, or a different expression altogether. If nothing is genuinely confusable, leave "variants" as [].`;
+    const schema = dictionarySchema(Boolean(glossLang));
+    type Entry = Omit<WordEntry, 'timestamp' | 'originalQuery'>;
+    const onDraft = opts?.onDraft;
+    const data = onDraft
+      ? await claudeJsonStream<Entry>(prompt, schema, raw => { const d = draftEntry(raw, word); if (d) onDraft(d); })
+      : await claudeJson<Entry>(prompt, schema);
     return data ? { ...data, timestamp: Date.now(), originalQuery: word } as WordEntry : null;
   } catch (error) {
     console.error("Error looking up word:", error);

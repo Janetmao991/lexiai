@@ -2,6 +2,8 @@
 // Claude handles all the reading/writing work (lookups, feedback, chat);
 // Gemini is kept only for audio (transcription + voices) — see geminiService.ts.
 import Anthropic from "@anthropic-ai/sdk";
+// Reads JSON that is still being written (closes the open brackets, drops the half-written last value).
+import { partialParse } from "@anthropic-ai/sdk/_vendor/partial-json-parser/parser.mjs";
 import { IS_DEMO, DemoNoteError } from "./demo";
 
 // ---- BYOK: the Claude key lives in this browser only ----
@@ -70,13 +72,14 @@ interface CallOpts {
 
 const send = async (
   messages: Anthropic.Beta.BetaMessageParam[],
-  opts: CallOpts & { schema?: Schema },
+  opts: CallOpts & { schema?: Schema; onText?: (soFar: string) => void },
 ) => {
   const model = getClaudeModel();
   // Opus/Sonnet: if a safety filter wrongly declines (rare), the API re-runs the
   // request on a fallback model instead of failing. Haiku has no fallback.
   const fallback = model.includes('haiku') ? {} : { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' };
-  const response = await getClient(opts.timeoutMs ?? 60000).beta.messages.create({
+  const client = getClient(opts.timeoutMs ?? 60000);
+  const params = {
     model,
     max_tokens: opts.maxTokens ?? 8000,
     ...(opts.system ? { system: opts.system } : {}),
@@ -86,7 +89,17 @@ const send = async (
       ...(opts.schema ? { format: { type: 'json_schema', schema: opts.schema } } : {}),
     },
     ...fallback,
-  } as Anthropic.Beta.MessageCreateParamsNonStreaming);
+  } as Anthropic.Beta.MessageCreateParamsNonStreaming;
+  let response: Anthropic.Beta.BetaMessage;
+  if (opts.onText) {
+    // Streaming: same request, same answer — but the text arrives piece by piece
+    // as Claude writes it, so the screen can start filling in right away.
+    const stream = client.beta.messages.stream(params);
+    stream.on('text', (_delta, soFar) => opts.onText!(soFar));
+    response = await stream.finalMessage();
+  } else {
+    response = await client.beta.messages.create(params);
+  }
   if (response.stop_reason === 'refusal') throw new Error('Claude declined to answer that one — try rephrasing.');
   return response.content
     .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === 'text')
@@ -100,6 +113,72 @@ export const claudeJson = async <T>(prompt: string | LexiPart[], schema: Schema,
   const content = typeof prompt === 'string' ? prompt : toClaudeContent(prompt);
   const text = await send([{ role: 'user', content }], { ...opts, schema });
   return text ? JSON.parse(text) as T : null;
+};
+
+/** If the text stops in the middle of a "string", close it — so a half-written sentence
+ *  can be shown as it grows instead of popping in whole once it is finished. */
+export const closeOpenString = (json: string): string => {
+  let inString = false;
+  let end = json.length;
+  for (let i = 0; i < json.length; i++) {
+    if (inString && json[i] === '\\') {
+      // An escape is 2 characters (\n, \") or 6 (\u00e9); if it is only half there, stop before it.
+      const length = json[i + 1] === 'u' ? 6 : 2;
+      if (i + length > json.length) { end = i; break; }
+      i += length - 1;
+    } else if (json[i] === '"') inString = !inString;
+  }
+  return inString ? json.slice(0, end) + '"' : json;
+};
+
+/** Like claudeJson, but `onPartial` is also called with the unfinished object while Claude
+ *  is still writing it — text included, so sentences appear as they are written. */
+export const claudeJsonStream = async <T>(
+  prompt: string,
+  schema: Schema,
+  onPartial: (partial: unknown) => void,
+  opts: CallOpts = {},
+): Promise<T | null> => {
+  // Text arrives from the network in uneven bursts (a clump, a pause, another clump).
+  // Showing it exactly as it lands looks jerky, so it is played back at an even pace:
+  // the screen trails the network by about a third of a second and reveals a few
+  // characters every tick — faster when a lot is waiting, never fully stopping while any is.
+  const TICK_MS = 30;
+  const CATCH_UP_MS = 350;      // how far behind the network the screen is allowed to trail
+  const MIN_CHARS_PER_SEC = 90; // slowest pace while there is still text waiting
+  let received = '';
+  let shown = 0;
+  let lastTick = Date.now();
+  let drained: (() => void) | undefined;
+  const tick = () => {
+    const now = Date.now();
+    const dt = now - lastTick;
+    lastTick = now;
+    const waiting = received.length - shown;
+    if (waiting <= 0) { drained?.(); return; }
+    const step = Math.max(MIN_CHARS_PER_SEC * dt / 1000, waiting * dt / CATCH_UP_MS, 1);
+    shown = Math.min(received.length, shown + Math.ceil(step));
+    try { onPartial(partialParse(closeOpenString(received.slice(0, shown)))); } catch { /* not parseable yet — wait for more */ }
+  };
+  const timer = setInterval(tick, TICK_MS);
+  try {
+    const text = await send([{ role: 'user', content: prompt }], {
+      ...opts,
+      schema,
+      onText: soFar => { received = soFar; },
+    });
+    // Let the last few words finish appearing instead of snapping to the end
+    // (capped, in case the tab is in the background and timers are slowed down).
+    if (shown < received.length) {
+      await Promise.race([
+        new Promise<void>(resolve => { drained = resolve; }),
+        new Promise<void>(resolve => setTimeout(resolve, 700)),
+      ]);
+    }
+    return text ? JSON.parse(text) as T : null;
+  } finally {
+    clearInterval(timer);
+  }
 };
 
 /** Plain-text reply for a whole conversation. 'model' turns are Claude's own earlier replies. */

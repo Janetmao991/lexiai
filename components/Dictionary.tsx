@@ -107,6 +107,9 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
   // Define (word)
   const [query, setQuery] = useState('');
   const [lookupResult, setLookupResult] = useState<WordEntry | null>(null);
+  // True while a lookup is still arriving: the entry on screen is unfinished (no saving yet).
+  const [drafting, setDrafting] = useState(false);
+  const lookupSeq = useRef(0);
 
   // Meaning in context (sentence)
   const [contextInput, setContextInput] = useState('');
@@ -161,19 +164,32 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
     const saved = !exact && savedEntry(word);
     if (saved) {
       // "You searched …" is about this search, not whatever query first saved the word.
+      lookupSeq.current++; // stops a lookup that is still arriving from drawing over this
+      setDrafting(false);
+      setLoading(false);
       setLookupResult({ ...saved, originalQuery: word });
       return;
     }
     setLoading(true);
     setLookupResult(null);
+    // If another lookup starts before this one finishes, this one must stop drawing.
+    const myLookup = ++lookupSeq.current;
+    const isCurrent = () => lookupSeq.current === myLookup;
     try {
-      const data = await lookupWord(word, { exact });
+      // The entry shows up sense by sense while Claude is still writing it.
+      const data = await lookupWord(word, {
+        exact,
+        onDraft: draft => { if (isCurrent()) { setDrafting(true); setLookupResult(draft); } },
+      });
+      if (!isCurrent()) return;
       if (data) setLookupResult(data);
-      else setError('No results found.');
+      else { setLookupResult(null); setError('No results found.'); }
     } catch (err: any) {
+      if (!isCurrent()) return;
+      setLookupResult(null);
       showError(err, 'Connection failed. Please try again.');
     } finally {
-      setLoading(false);
+      if (isCurrent()) { setDrafting(false); setLoading(false); }
     }
   };
 
@@ -420,7 +436,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
   // Gloss language is on but this entry predates it (or was imported): fill the missing
   // glosses once, and keep them on the saved word so it isn't asked again.
   useEffect(() => {
-    if (!lookupResult) return;
+    if (!lookupResult || drafting) return;
     let cancelled = false;
     fillGlosses(lookupResult).then(filled => {
       if (!filled || cancelled) return;
@@ -432,7 +448,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
       }
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [lookupResult?.word]);
+  }, [lookupResult?.word, drafting]);
 
   // Demo mode: "not in the demo" notes sit right under the input, above the sample chips.
   const demoNoteBox = error && errorIsNote && (
@@ -527,7 +543,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
                     </button>
                   </div>
                   {/* The entry was normalized to a different headword — keep the query visible instead of swallowing it. */}
-                  {lookupResult.originalQuery
+                  {!drafting && lookupResult.originalQuery
                     && normalizeForm(lookupResult.originalQuery) !== normalizeForm(lookupResult.word)
                     && !lookupResult.candidates?.length && (
                     <p className="text-sm text-[#8C8880]">
@@ -546,8 +562,8 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
                 <div className="self-start sm:self-auto flex flex-col items-start sm:items-end gap-1.5">
                 <button
                   onClick={() => onSave(lookupResult)}
-                  disabled={isSaved(lookupResult.word)}
-                  className={`flex items-center gap-2.5 min-h-[46px] px-5 rounded-full text-sm font-medium transition-colors ${
+                  disabled={drafting || isSaved(lookupResult.word)}
+                  className={`flex items-center gap-2.5 min-h-[46px] px-5 rounded-full text-sm font-medium transition-colors disabled:opacity-60 ${
                     isSaved(lookupResult.word) ? 'bg-[#F3EFE6] text-[#55524C] cursor-default' : 'bg-stone-900 text-[#FBF9F4] hover:bg-black'
                   }`}
                 >
@@ -623,6 +639,13 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
                   ))}
                 </div>
               ))}
+
+              {/* Still arriving: say so, so a pause reads as "writing", not "stuck". */}
+              {drafting && (
+                <p role="status" className="flex items-center gap-2.5 font-serif italic text-[15px] text-[#8C8880]">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Writing the rest of the entry…
+                </p>
+              )}
 
               {unassigned.length > 0 && (
                 <div className="space-y-3 pt-2">
