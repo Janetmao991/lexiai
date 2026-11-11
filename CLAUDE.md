@@ -43,7 +43,7 @@ Owner: Janet — self-taught builder. Explain non-obvious technical choices in p
 
 ## Current status
 - 2026-11-11: Look up streams — the entry appears as Claude writes it, played back at an even pace
-  (`claudeJsonStream` in `services/claude.ts`). On branch `faster-lookup`, not merged or deployed yet.
+  (`claudeJsonStream` in `services/claude.ts`). Merged to main and pushed (Vercel deploys from main).
   Untried speed options: fast mode (2x price), or Sonnet/Haiku for lookups.
 - 2026-11-06: Look up lists every part of speech (finance senses added, not substituted); "Refresh senses" on Notebook
   words; Sentence mode auto-fixes typos ("Keep as typed" to undo). Merged to main and live on Vercel.
