@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { askLexiTurn, analyzeSource, hasApiKey, ImageWordPick, LexiPart } from '../services/claudeService';
+import { getScreenContext, onScreenContext } from '../services/screenContext';
 import { IS_DEMO, isDemoNote, demoFixture } from '../services/demo';
 import { Sparkles, X, Send, Loader2, Eraser, ImagePlus, Search, Paperclip, Upload, FileText } from 'lucide-react';
 
@@ -107,6 +108,9 @@ export const AskAI: React.FC<AskAIProps> = ({ onLookup }) => {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
+  /** Short label of the page Lexi can see ("Look up · presumption"), shown above the composer. */
+  const [seeing, setSeeing] = useState(getScreenContext().summary);
+  useEffect(() => onScreenContext(setSeeing), []);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingFile | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -260,7 +264,7 @@ export const AskAI: React.FC<AskAIProps> = ({ onLookup }) => {
         pushHistory('user', turnParts);
         pushHistory('model', [{ text: replyText }]);
       } else {
-        const reply = await askLexiTurn(historyRef.current, turnParts);
+        const reply = await askLexiTurn(historyRef.current, turnParts, getScreenContext().detail || undefined);
         setMessages(prev => [...prev, { role: 'model', text: reply }]);
         pushHistory('user', turnParts);
         pushHistory('model', [{ text: reply }]);
@@ -428,6 +432,11 @@ export const AskAI: React.FC<AskAIProps> = ({ onLookup }) => {
             </div>
           )}
 
+          {seeing && (
+            <p className="px-4 pt-2 text-[11.5px] text-stone-400 truncate" title="Lexi reads this page when you ask — say “this sense” or “here” and it knows what you mean">
+              Lexi can see: <span className="text-stone-600">{seeing}</span>
+            </p>
+          )}
           <form
             onSubmit={(e) => { e.preventDefault(); send(); }}
             className="flex items-center gap-2 p-3 border-t border-stone-100"

@@ -3,6 +3,7 @@ import { WordEntry, SynonymComparison, ContextMeaning, UserContext } from '../ty
 import { lookupWord, compareSynonyms, explainInContext, pickSense, addMissingSense, tagSenses, fillGlosses } from '../services/claudeService';
 import { playPronunciation } from '../services/geminiService';
 import { ipaLabel, senseLabel } from '../services/format';
+import { setScreenContext } from '../services/screenContext';
 import { preparePronunciation } from '../services/pronunciation';
 import { IS_DEMO, isDemoNote, showDemoNote, demoFixture } from '../services/demo';
 import { Search, Volume2, Loader2, GitCompare, Sparkles, Check, Save, Bookmark, ArrowRight, ArrowLeft, RefreshCw } from 'lucide-react';
@@ -480,6 +481,40 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
   };
 
   const headwordRef = useFitOneLine(lookupResult?.word);
+
+  // Tell Ask Lexi what this page shows, so the learner can ask about it without pasting anything.
+  useEffect(() => {
+    const senses = (e: WordEntry) => e.meanings.flatMap((m, mi) => m.definitions.map((d, di) =>
+      `  Sense ${senseLabel(e, mi, di)}. (${m.partOfSpeech}) ${d.definition}${d.gloss ? ` [${d.gloss}]` : ''}${d.examples?.[0] ? ` — e.g. "${d.examples[0]}"` : ''}`)).join('\n');
+    if (activeMode === 'CONTEXT' && contextResult) {
+      const cs = contextSense;
+      const label = cs?.sense ? `Sense ${senseLabel(cs.entry, cs.sense.meaning, cs.sense.definition)}${cs.added ? ' (just added — the entry was missing it)' : ''}` : cs ? 'none of the dictionary senses' : 'still being matched';
+      setScreenContext(`Sentence · ${contextResult.word}`, [
+        `Page: Look up → Sentence mode (explains a word inside a sentence the learner pasted).`,
+        `Sentence: "${contextSentence}"`,
+        `Word explained: "${contextResult.word}"`,
+        `Meaning here: ${contextResult.meaningHere}${contextResult.glossHere ? ` [${contextResult.glossHere}]` : ''}`,
+        contextResult.usualMeaning ? `Shown as "not the usual meaning": ${contextResult.usualMeaning}` : '',
+        contextResult.clues.length ? `Clues shown: ${contextResult.clues.map(c => `"${c.quote}" — ${c.why}`).join('; ')}` : '',
+        `Paraphrase shown: ${contextResult.paraphrase}`,
+        `Matched dictionary sense: ${label}`,
+        cs ? `The word's dictionary senses:\n${senses(cs.entry)}` : '',
+      ].filter(Boolean).join('\n'));
+    } else if (activeMode === 'DEFINE' && lookupResult) {
+      setScreenContext(`Look up · ${lookupResult.word}`, [
+        `Page: Look up → Word mode (a dictionary entry).`,
+        `Word: "${lookupResult.word}"${lookupResult.ipa ? ` ${ipaLabel(lookupResult.ipa)}` : ''}${drafting ? ' (entry still being written)' : ''}`,
+        `Senses, numbered as shown on screen:\n${senses(lookupResult)}`,
+        (lookupResult.contexts || []).length ? `Learner's saved sentences: ${(lookupResult.contexts || []).map(c => `"${c.targetSentence || c.fullText}"${c.sense ? ` (sense ${senseLabel(lookupResult, c.sense.meaning, c.sense.definition)})` : ''}`).join('; ')}` : '',
+      ].filter(Boolean).join('\n'));
+    } else if (activeMode === 'COMPARE' && compareResult) {
+      const c = compareResult;
+      setScreenContext(`Compare · ${[c.word1, c.word2, c.word3].filter(Boolean).join(' / ')}`,
+        `Page: Look up → Compare mode.\n${JSON.stringify(c)}`);
+    } else {
+      setScreenContext('Look up', 'Page: Look up (nothing looked up yet).');
+    }
+  }, [activeMode, lookupResult, drafting, contextResult, contextSense, contextSentence, compareResult]);
 
   useEffect(() => { if (lookupResult) preparePronunciation(lookupResult.word); }, [lookupResult?.word]);
 

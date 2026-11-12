@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { setScreenContext, entryText } from '../services/screenContext';
 import { WordEntry, UserContext } from '../types';
 import { libraryAvailable, wordsWithClips, PodcastClip, formatTime } from '../services/podcastService';
 import { PodcastClips } from './PodcastClips';
@@ -44,6 +45,16 @@ export const Podcasts: React.FC<PodcastsProps> = ({ words, onUpdateWord, onOpenW
     .sort((a, b) => a.word.localeCompare(b.word));
   const q = query.trim().toLowerCase();
   const shown = q ? heard.filter(w => w.word.toLowerCase().includes(q)) : heard;
+
+  // Tell Ask Lexi which words have podcast clips and which one is open.
+  useEffect(() => {
+    const openEntry = open ? words.find(w => w.word === open) : undefined;
+    setScreenContext(openEntry ? `Podcasts · ${openEntry.word}` : 'Podcasts', [
+      `Page: Podcasts tab — the learner's saved words that were heard in real podcast clips.`,
+      status === 'ready' ? `Words with clips: ${shown.slice(0, 60).map(w => w.word).join(', ') || 'none'}` : `Library status: ${status}`,
+      openEntry ? `Open word (its clips are playing below it):\n${entryText(openEntry)}` : '',
+    ].filter(Boolean).join('\n'));
+  }, [open, status, shown.length, words]);
 
   const saveClip = (entry: WordEntry, clip: PodcastClip, sense: { meaning: number; definition: number } | null) => {
     const ctx: UserContext = {

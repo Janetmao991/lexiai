@@ -42,6 +42,9 @@ Owner: Janet — self-taught builder. Explain non-obvious technical choices in p
 - At the end of a work session, update "Current status" below (3–5 lines max).
 
 ## Current status
+- 2026-11-12: Sentence breakdown labels which sense the word uses ("Sense ii"); if none fits, Claude writes the
+  missing sense into the entry (`addMissingSense`). Look up now lists every sense in use today, not just "main" ones.
+  "Full definition" from a sentence reuses the fetched entry. Pushed to main (15a3fe7), not yet tried with a real key.
 - 2026-11-11: Look up streams — the entry appears as Claude writes it, played back at an even pace
   (`claudeJsonStream` in `services/claude.ts`). Merged to main and pushed (Vercel deploys from main).
   Untried speed options: fast mode (2x price), or Sonnet/Haiku for lookups.

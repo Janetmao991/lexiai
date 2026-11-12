@@ -145,10 +145,15 @@ Rules:
     second word mean?" still works after a photo was sent. */
 export const askLexiTurn = async (
   history: { role: 'user' | 'model'; parts: LexiPart[] }[],
-  parts: LexiPart[]
+  parts: LexiPart[],
+  screen?: string
 ): Promise<string> => {
   if (IS_DEMO) return demoAskLexi(parts.map(p => ('text' in p ? p.text : '')).join(' '));
-  const reply = await claudeChat([...history, { role: 'user', parts }], { system: LEXI_PERSONA });
+  // What's on the learner's screen right now, so "this", "sense ii", "the second example" make sense.
+  const system = screen
+    ? `${LEXI_PERSONA}\n\nWHAT THE LEARNER IS LOOKING AT IN THE APP RIGHT NOW (use it when they say "this", "here", "sense ii", etc.; don't recite it back):\n${screen}`
+    : LEXI_PERSONA;
+  const reply = await claudeChat([...history, { role: 'user', parts }], { system });
   return reply || 'Hmm, no answer came back — try rephrasing?';
 };
 

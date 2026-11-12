@@ -1,5 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
+import { setScreenContext, entryText } from '../services/screenContext';
 import { WordEntry, UserContext } from '../types';
 import { analyzeContextFromText, askAboutContext, fillGlosses } from '../services/claudeService';
 import { playPronunciation } from '../services/geminiService';
@@ -195,6 +196,18 @@ export const Notebook: React.FC<NotebookProps> = ({ words, onDelete, onUpdateWor
     && (filter !== 'sentences' || (w.contexts?.length ?? 0) > 0)
     && (filter !== 'due' || (!!w.srs && srsService.isDue(w)))
   );
+
+  // Tell Ask Lexi what the Notebook shows: the list, any opened words, any sentence open in the side panel.
+  useEffect(() => {
+    const opened = words.filter(w => expandedWords.has(w.word));
+    const side = sidebarContext;
+    setScreenContext(side ? `Notebook · ${side.word.word} sentence` : opened.length ? `Notebook · ${opened.map(w => w.word).join(', ')}` : 'Notebook', [
+      `Page: Notebook tab (the learner's saved words), ${words.length} words${searchQuery ? `, searching "${searchQuery}" (${filteredWords.length} found)` : ''}${filter !== 'all' ? `, filter: ${filter}` : ''}.`,
+      `Words in the list: ${filteredWords.slice(0, 60).map(w => w.word).join(', ')}${filteredWords.length > 60 ? ' …' : ''}`,
+      side ? `Open in the side panel — a saved sentence for "${side.word.word}": "${side.context.targetSentence || side.context.fullText}"${side.context.explanation ? `\nIts note: ${side.context.explanation}` : ''}` : '',
+      ...opened.slice(0, 5).map(w => `Opened word:\n${entryText(w)}`),
+    ].filter(Boolean).join('\n'));
+  }, [words, expandedWords, sidebarContext, searchQuery, filter, filteredWords.length]);
 
   const smartSuggestions = [
     "Analyze the Stylistic Nuance.",

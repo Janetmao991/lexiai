@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { setScreenContext, entryText } from '../services/screenContext';
 import { WordEntry, SrsRating } from '../types';
 import { srsService, MASTERY_META } from '../services/srsService';
 import { ChevronLeft, ChevronRight, CheckCircle2, Layers, Gamepad2, CalendarClock, Keyboard, Volume2 } from 'lucide-react';
@@ -66,6 +67,20 @@ export const Flashcards: React.FC<FlashcardsProps> = ({ words, onReview, onGameC
   // Warm the pronunciation of the card on screen so the speaker button plays on the first tap.
   const upcoming = mode === 'due' ? dueQueue[0]?.word : words[browseIndex % Math.max(1, words.length)]?.word;
   useEffect(() => { if (upcoming) preparePronunciation(upcoming); }, [upcoming]);
+
+  // Tell Ask Lexi which card is up — and whether it's been flipped, so it doesn't spoil the answer.
+  useEffect(() => {
+    const card = mode === 'due' ? dueQueue[0] : words[browseIndex % Math.max(1, words.length)];
+    if (mode === 'game' || mode === 'spell') { setScreenContext(`Review · ${mode === 'game' ? 'game' : 'spelling'}`, `Page: Review tab, ${mode} mode.`); return; }
+    if (!card) { setScreenContext('Review', 'Page: Review tab — no cards due right now.'); return; }
+    const ctx = card.contexts?.length ? card.contexts[card.contexts.length - 1] : undefined;
+    setScreenContext(`Review · ${isFlipped ? card.word : 'card (not flipped)'}`, [
+      `Page: Review tab, flashcard (${mode === 'due' ? `${dueQueue.length} due` : 'browsing all words'}).`,
+      ctx ? `The card quizzes the word inside this sentence: "${ctx.targetSentence || ctx.fullText}"` : '',
+      isFlipped ? 'The card is flipped — the answer is showing.' : 'The card is NOT flipped yet: the learner is trying to recall it. Give hints, not the meaning, unless they ask for the answer.',
+      `Card:\n${entryText(card)}`,
+    ].filter(Boolean).join('\n'));
+  }, [mode, dueQueue, words, browseIndex, isFlipped]);
 
   if (words.length === 0) {
     return (
