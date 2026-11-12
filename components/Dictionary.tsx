@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { WordEntry, SynonymComparison, ContextMeaning, UserContext } from '../types';
-import { lookupWord, compareSynonyms, explainInContext, pickSense, tagSenses, fillGlosses } from '../services/claudeService';
+import { lookupWord, compareSynonyms, explainInContext, pickSense, addMissingSense, tagSenses, fillGlosses } from '../services/claudeService';
 import { playPronunciation } from '../services/geminiService';
 import { ipaLabel, senseLabel } from '../services/format';
 import { preparePronunciation } from '../services/pronunciation';
@@ -117,6 +117,9 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
   const [contextResult, setContextResult] = useState<ContextMeaning | null>(null);
   const [contextSave, setContextSave] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [savedSense, setSavedSense] = useState<string>('');
+  /** Which dictionary sense the sentence uses, worked out right after the explanation arrives.
+   *  undefined = still checking; sense null = none of the entry's senses fits. */
+  const [contextSense, setContextSense] = useState<{ key: string; entry: WordEntry; sense: { meaning: number; definition: number } | null; added?: boolean } | undefined>();
   /** The sentence as the learner typed it, when Claude fixed typos in it ('' = nothing fixed). */
   const [typoFixedFrom, setTypoFixedFrom] = useState('');
   /** The learner chose "Keep as typed" — don't correct this sentence again while they tap words in it. */
@@ -193,6 +196,25 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
     }
   };
 
+  /** "Full definition" from the sentence page: show the entry already fetched for it (including any
+   *  sense just added) instead of asking Claude to write the word up again. */
+  const openFullDefinition = () => {
+    if (!contextResult) return;
+    const cs = contextSense;
+    if (savedEntry(contextResult.word) || !cs || cs.key !== `${contextResult.word}|${contextSentence}`) {
+      doLookup(contextResult.word);
+      return;
+    }
+    setActiveMode('DEFINE');
+    setQuery(contextResult.word);
+    setError('');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    lookupSeq.current++;
+    setDrafting(false);
+    setLoading(false);
+    setLookupResult({ ...cs.entry, originalQuery: contextResult.word });
+  };
+
   /** A Notebook word keeps the entry it was saved with. Re-ask Claude for its senses
    *  (e.g. a part of speech that was missing), keeping review progress and saved sentences,
    *  which are re-filed under the matching new sense. */
@@ -263,6 +285,33 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
     }
   };
 
+  // Once a sentence is explained, find which numbered sense of the word it uses — so the
+  // breakdown can say "sense ii" before anything is saved.
+  useEffect(() => {
+    setContextSense(undefined);
+    if (!contextResult) return;
+    const key = `${contextResult.word}|${contextSentence}`;
+    let cancelled = false;
+    (async () => {
+      try {
+        const entry = savedEntry(contextResult.word) ?? await lookupWord(contextResult.word, { exact: true });
+        if (!entry || cancelled) return;
+        const sense = await pickSense(entry, contextSentence, contextResult.meaningHere).catch(() => null);
+        if (cancelled) return;
+        if (sense) { setContextSense({ key, entry, sense }); return; }
+        // None of the entry's senses fits — the entry is incomplete, so write the missing sense into it.
+        const grown = await addMissingSense(entry, contextSentence, contextResult.meaningHere).catch(() => null);
+        if (cancelled) return;
+        if (!grown) { setContextSense({ key, entry, sense: null }); return; }
+        // A Notebook word is updated right away; an unsaved one keeps it until it is saved.
+        if (savedEntry(contextResult.word)) onSave(grown.entry);
+        setContextSense({ key, entry: grown.entry, sense: grown.sense, added: true });
+      } catch { /* label just stays hidden */ }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contextResult]);
+
   useEffect(() => {
     const w = lookupRequest?.word?.trim();
     if (!w) return;
@@ -290,9 +339,10 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
     setContextSave('saving');
     setError('');
     try {
-      const entry = savedEntry(contextResult.word) ?? await lookupWord(contextResult.word, { exact: true });
+      const known = contextSense?.key === `${contextResult.word}|${contextSentence}` ? contextSense : undefined;
+      const entry = known?.entry ?? savedEntry(contextResult.word) ?? await lookupWord(contextResult.word, { exact: true });
       if (!entry) throw new Error('No dictionary entry');
-      const sense = await pickSense(entry, contextSentence, contextResult.meaningHere).catch(() => null);
+      const sense = known ? known.sense : await pickSense(entry, contextSentence, contextResult.meaningHere).catch(() => null);
       const ctx: UserContext = {
         id: Date.now().toString(),
         sourceTitle: 'From your reading',
@@ -719,7 +769,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
                   <p className="font-serif text-2xl sm:text-[32px] leading-[1.5] tracking-[-0.01em]">
                     {tappable(before)}
                     {hit && (
-                      <button onClick={() => doLookup(contextResult.word)} title="Open the full definition" className="lx-mark font-semibold text-stone-900">{hit}</button>
+                      <button onClick={openFullDefinition} title="Open the full definition" className="lx-mark font-semibold text-stone-900">{hit}</button>
                     )}
                     {tappable(after)}
                   </p>
@@ -752,12 +802,27 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
                       <h2 className="lx-label">
                         Here, <span className="normal-case tracking-normal font-serif italic text-[15px] font-medium text-stone-900">{contextResult.word}</span> means
                       </h2>
-                      <button onClick={() => doLookup(contextResult.word)} className="flex items-center gap-1.5 min-h-[36px] text-[13.5px] font-medium text-stone-900 border-b border-[#D9D3C7] hover:border-stone-900">
+                      <button onClick={openFullDefinition} className="flex items-center gap-1.5 min-h-[36px] text-[13.5px] font-medium text-stone-900 border-b border-[#D9D3C7] hover:border-stone-900">
                         Full definition <ArrowRight className="w-3.5 h-3.5" />
                       </button>
                     </div>
                     <p className="font-serif text-xl sm:text-2xl leading-[1.38] font-bold">{contextResult.meaningHere}</p>
                     {contextResult.glossHere && <p className="gloss">{contextResult.glossHere}</p>}
+                    {(() => {
+                      const cs = contextSense;
+                      if (!cs) return <p className="font-serif italic text-sm text-[#B5AFA3]">Finding which sense this is…</p>;
+                      if (!cs.sense) return <p className="font-serif italic text-sm text-[#8C8880]">Not one of the senses in its dictionary entry — a use specific to this context.</p>;
+                      const m = cs.entry.meanings[cs.sense.meaning];
+                      const d = m?.definitions[cs.sense.definition];
+                      return (
+                        <button onClick={openFullDefinition} className="text-left text-[14px] text-[#6B675F] hover:text-stone-900">
+                          <span className="font-serif italic text-stone-900">Sense {senseLabel(cs.entry, cs.sense.meaning, cs.sense.definition)}.</span>
+                          {m && <span className="ml-1.5 lx-label">{m.partOfSpeech}</span>}
+                          {d && <span className="ml-1.5">— {d.definition}</span>}
+                          {cs.added && <span className="ml-1.5 font-serif italic text-[#9A5420]">· new — added to the dictionary entry</span>}
+                        </button>
+                      );
+                    })()}
                   </div>
                 </section>
 
@@ -810,7 +875,7 @@ export const Dictionary: React.FC<DictionaryProps> = ({ onSave, savedWords, look
                         <Check className="w-4 h-4 text-[#9A5420]" />
                         <span>Saved to Notebook — <span className="font-serif italic text-base">{contextResult.word}</span>{savedSense ? `, sense ${savedSense}` : ''}</span>
                       </span>
-                      <button onClick={() => doLookup(contextResult.word)} className="min-h-[44px] px-4 rounded-full bg-stone-900 text-[#FBF9F4] text-[13.5px] font-medium hover:bg-black">
+                      <button onClick={openFullDefinition} className="min-h-[44px] px-4 rounded-full bg-stone-900 text-[#FBF9F4] text-[13.5px] font-medium hover:bg-black">
                         See it in the definition
                       </button>
                     </div>

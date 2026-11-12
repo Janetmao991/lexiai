@@ -221,7 +221,7 @@ export const lookupWord = async (word: string, opts?: { exact?: boolean; onDraft
       OVERRIDE — the learner has already been shown a different headword and has asked for "${word}" exactly as typed: use it verbatim as the headword, set "wasCorrected" to false, and if it is rare, informal or non-standard, say so inside the first definition instead of substituting another form.` : ''}
       3. Provide IPA, detailed meanings, and advanced usage examples.
       4. ESSENTIAL: Provide 4-6 natural collocations for each definition.
-      5. COVER EVERY PART OF SPEECH: Give one "meanings" item for EACH part of speech the word is commonly used as (e.g. "churn" is both a verb — customers churn, churn butter — and a noun — customer churn). Never drop a common part of speech because another one seems more important. Within each, list the main senses, most common first.
+      5. COVER EVERY PART OF SPEECH: Give one "meanings" item for EACH part of speech the word is commonly used as (e.g. "churn" is both a verb — customers churn, churn butter — and a noun — customer churn). Never drop a common part of speech because another one seems more important. Within each, list EVERY distinct sense an advanced reader meets today in news, business, law, academic writing and everyday conversation — not just the main ones (e.g. "presumption" needs both "an idea taken to be true without proof" and the legal/formal "a default assumption that holds unless shown otherwise", besides "arrogant boldness"). Give a separate definition whenever the meaning is genuinely different; merge senses that differ only slightly so the list has no near-duplicates. Leave out archaic, obsolete, dialect and very rare senses. Most common first.
       5a. ORDER BY HOW COMMON IT IS TODAY: Order the "meanings" items (finance ones included) by how often an educated adult meets that use in today's English — news, business, work and everyday conversation — most common first, not by historical or "literal first" order. E.g. for "churn", customer churn (noun) and customers churning (verb) come before making butter.
       5b. FINANCIAL FOCUS: If the word ALSO has a specific meaning in Finance, Business, or Economics, ENSURE you include it — as its own "meanings" item with partOfSpeech exactly "Noun (Finance)", "Verb (Finance)", etc. — in addition to the general senses, never instead of them. If the finance sense exists as both a noun and a verb, give both.${glossInstruction(glossLang)}
       6. REVERSE LOOKUP: The input may be CHINESE (or an English description of a meaning) instead of an English word. In that case, pick the single closest English word/phrase as the headword and fill "candidates" with 2-3 OTHER English words that also express it, ordered closest-in-meaning first, each with a one-line "nuance" explaining when it fits better than the headword. For a normal English-word lookup, leave "candidates" as [].
@@ -392,11 +392,45 @@ export const pickSense = async (entry: WordEntry, sentence: string, meaningHere:
   if (senses.length === 1) return { meaning: 0, definition: 0 };
   const res = await claudeJson<{ sense: number }>(`Sentence: "${sentence}"
 In it, "${entry.word}" means: ${meaningHere}
-Which numbered sense below is that? Answer with its number.
+Which numbered sense below is that? Answer with its number, or 0 if none of them fits.
 ${senses.map((s, i) => `${i + 1}. ${s.text}`).join('\n')}`,
     S.obj({ sense: S.num() }), { maxTokens: 4000 });
   const hit = senses[Number(res?.sense) - 1];
   return hit ? { meaning: hit.mi, definition: hit.di } : null;
+};
+
+/**
+ * The sentence uses a meaning the entry doesn't have: write it up as a proper dictionary sense
+ * and add it under its part of speech (or a new one). Returns the grown entry and where the
+ * new sense sits, or null if Claude couldn't produce one.
+ */
+export const addMissingSense = async (entry: WordEntry, sentence: string, meaningHere: string): Promise<{ entry: WordEntry; sense: { meaning: number; definition: number } } | null> => {
+  if (IS_DEMO) return null;
+  const glossLang = getGlossLang();
+  const res = await claudeJson<{ partOfSpeech: string } & WordEntry['meanings'][number]['definitions'][number]>(`Act as a world-class lexicographer.
+The dictionary entry for "${entry.word}" is missing a sense. In this sentence:
+"${sentence}"
+it means: ${meaningHere}
+
+Existing senses (do not repeat them):
+${entry.meanings.flatMap(m => m.definitions.map(d => `- ${m.partOfSpeech}: ${d.definition}`)).join('\n')}
+
+Write the missing sense as a general dictionary definition (not tied to this one sentence), as an advanced learner's dictionary would. "partOfSpeech": reuse one of these labels if it fits — ${[...new Set(entry.meanings.map(m => m.partOfSpeech))].join(', ')} — otherwise a new one in the same style. Give 2 example sentences (not the one above), 2-4 synonyms and 4-6 natural collocations.${glossInstruction(glossLang)}`,
+    S.obj({
+      partOfSpeech: S.str(),
+      definition: S.str(),
+      ...(glossLang ? { gloss: S.str() } : {}),
+      synonyms: S.arr(S.str()),
+      examples: S.arr(S.str()),
+      collocations: S.arr(S.str()),
+    }), { maxTokens: 4000 });
+  if (!res?.definition) return null;
+  const { partOfSpeech, ...def } = res;
+  const meanings = entry.meanings.map(m => ({ ...m, definitions: [...m.definitions] }));
+  let mi = meanings.findIndex(m => m.partOfSpeech.trim().toLowerCase() === (partOfSpeech || '').trim().toLowerCase());
+  if (mi < 0) { meanings.push({ partOfSpeech: partOfSpeech || 'Noun', definitions: [] }); mi = meanings.length - 1; }
+  meanings[mi].definitions.push(def);
+  return { entry: { ...entry, meanings }, sense: { meaning: mi, definition: meanings[mi].definitions.length - 1 } };
 };
 
 /** Which sense each sentence uses — one call for a batch (e.g. podcast clips). null = no clear match. */
